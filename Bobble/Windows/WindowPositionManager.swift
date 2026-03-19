@@ -20,7 +20,10 @@ struct WindowPositionManager {
             + stackVisualOverflow
             + inset
         let headsWidth = headDiameter + stackVisualOverflow
-        return NSSize(width: headsWidth + inset, height: height)
+        return NSSize(
+            width: headsWidth + inset + DesignTokens.headPreviewOverflow,
+            height: height
+        )
     }
 
     // MARK: - Expanded state (deck of heads + chat window)
@@ -38,7 +41,10 @@ struct WindowPositionManager {
         let headsSection = inset + addH + headsGap + deckH
 
         let totalH = headsSection + vStackSpacing + chatHeight
-        return NSSize(width: chatWidth, height: totalH)
+        return NSSize(
+            width: chatWidth + DesignTokens.headPreviewOverflow,
+            height: totalH
+        )
     }
 
     // MARK: - Panel origin (anchored at bottom-right of screen)

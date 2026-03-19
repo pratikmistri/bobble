@@ -20,6 +20,7 @@ class CLIProcessManager {
     var onError: ((String) -> Void)?
     var onSessionId: ((String) -> Void)?
     var onAssistantMessageStarted: (() -> Void)?
+    var onTurnCompleted: (() -> Void)?
 
     init(
         backend: CLIBackend,
@@ -99,6 +100,10 @@ class CLIProcessManager {
 
         parser.onAssistantMessageStarted = { [weak self] in
             self?.onAssistantMessageStarted?()
+        }
+
+        parser.onTurnCompleted = { [weak self] in
+            self?.onTurnCompleted?()
         }
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in

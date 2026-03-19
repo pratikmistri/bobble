@@ -10,6 +10,7 @@ class StreamParser {
     var onSessionId: ((String) -> Void)?
     var onEventText: ((String) -> Void)?
     var onAssistantMessageStarted: (() -> Void)?
+    var onTurnCompleted: (() -> Void)?
 
     init(backend: CLIBackend) {
         self.backend = backend
@@ -155,6 +156,9 @@ class StreamParser {
                     onEventText?(eventText)
                 }
             }
+
+        case "turn.completed":
+            onTurnCompleted?()
 
         case "error", "turn.failed":
             if let eventText = renderCodexEvent(type: type, payload: json) {

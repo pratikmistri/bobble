@@ -1,8 +1,11 @@
 import Foundation
 
 struct ChatSession: Identifiable {
+    static let defaultChatHeadSymbol = "💬"
+
     let id: UUID
     var name: String
+    var chatHeadSymbol: String
     var selectedModel: CodexModelOption
     var messages: [ChatMessage]
     var state: SessionState
@@ -15,9 +18,8 @@ struct ChatSession: Identifiable {
         case error(String)
     }
 
-    var initial: String {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? "?" : String(trimmed.prefix(1)).uppercased()
+    var displayChatHeadSymbol: String {
+        Self.sanitizedChatHeadSymbol(from: chatHeadSymbol) ?? Self.defaultChatHeadSymbol
     }
 
     var hasUnread: Bool {
@@ -41,6 +43,7 @@ struct ChatSession: Identifiable {
         let newId = UUID()
         self.id = newId
         self.name = name
+        self.chatHeadSymbol = Self.defaultChatHeadSymbol
         self.selectedModel = .default
         self.messages = []
         self.state = .idle
@@ -68,5 +71,39 @@ struct ChatSession: Identifiable {
             try? fm.createDirectory(at: fallback, withIntermediateDirectories: true)
             return fallback.path
         }
+    }
+
+    static func sanitizedChatHeadSymbol(from rawValue: String) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        for character in trimmed where !character.isWhitespaceLike {
+            if character.isEmojiBadge {
+                return String(character)
+            }
+        }
+
+        return nil
+    }
+
+    mutating func updateChatHeadSymbol(from rawValue: String?) {
+        guard let rawValue,
+              let symbol = Self.sanitizedChatHeadSymbol(from: rawValue) else {
+            return
+        }
+
+        chatHeadSymbol = symbol
+    }
+}
+
+private extension Character {
+    var isEmojiBadge: Bool {
+        guard let firstScalar = unicodeScalars.first else { return false }
+        return firstScalar.properties.isEmojiPresentation
+            || (firstScalar.properties.isEmoji && unicodeScalars.count > 1)
+    }
+
+    var isWhitespaceLike: Bool {
+        unicodeScalars.allSatisfy { CharacterSet.whitespacesAndNewlines.contains($0) }
     }
 }

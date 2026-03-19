@@ -38,7 +38,7 @@ struct ChatContentView: View {
                     .fill(DesignTokens.surfaceAccent)
                     .frame(width: 24, height: 24)
                     .overlay(
-                        Text(viewModel.session.initial)
+                        Text(viewModel.session.displayChatHeadSymbol)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(DesignTokens.textPrimary)
                     )

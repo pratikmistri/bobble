@@ -14,6 +14,7 @@ class ChatSessionViewModel: ObservableObject {
 
     private let backend: CLIBackend?
     private var processManager: CLIProcessManager?
+    private var chatHeadSymbolProcess: CLIProcessManager?
     private var cancellables = Set<AnyCancellable>()
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
@@ -27,6 +28,7 @@ class ChatSessionViewModel: ObservableObject {
         let prompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = pendingAttachments
         guard !prompt.isEmpty || !attachments.isEmpty else { return }
+        let isFirstUserTurn = session.messages.isEmpty
 
         inputText = ""
         pendingAttachments = []
@@ -41,6 +43,10 @@ class ChatSessionViewModel: ObservableObject {
         let userMessage = ChatMessage(role: .user, content: prompt, attachments: attachments)
         session.messages.append(userMessage)
         notifyUpdate()
+
+        if isFirstUserTurn {
+            updateChatHeadSymbolFromFirstMessage(prompt: prompt, attachments: attachments)
+        }
 
         guard let backend = backend, let path = backend.resolvedPath() else {
             let errorMsg = ChatMessage(
@@ -98,23 +104,7 @@ class ChatSessionViewModel: ObservableObject {
         pm.onComplete = { [weak self] in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
-                    self.session.messages[idx].isStreaming = false
-                    // If empty response, add a note
-                    if self.session.messages[idx].content.isEmpty {
-                        let hasFollowupEvent = self.session.messages.indices.contains(where: { messageIndex in
-                            messageIndex > idx
-                            && self.session.messages[messageIndex].role == .system
-                            && !self.session.messages[messageIndex].content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        })
-                        if hasFollowupEvent {
-                            self.session.messages.remove(at: idx)
-                        } else {
-                            self.session.messages[idx].content = "(No response)"
-                        }
-                    }
-                }
-                self.session.state = .idle
+                self.finishAssistantRun()
                 self.processManager = nil
                 self.notifyUpdate()
             }
@@ -134,6 +124,14 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.startAssistantMessageIfNeeded()
+                self.notifyUpdate()
+            }
+        }
+
+        pm.onTurnCompleted = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.finishAssistantRun()
                 self.notifyUpdate()
             }
         }
@@ -159,6 +157,8 @@ class ChatSessionViewModel: ObservableObject {
     func terminate() {
         processManager?.stop()
         processManager = nil
+        chatHeadSymbolProcess?.stop()
+        chatHeadSymbolProcess = nil
     }
 
     func selectModel(_ model: CodexModelOption) {
@@ -316,6 +316,28 @@ class ChatSessionViewModel: ObservableObject {
         session.messages.append(ChatMessage(role: .assistant, content: text))
     }
 
+    private func finishAssistantRun() {
+        if let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+            session.messages[idx].isStreaming = false
+            if session.messages[idx].content.isEmpty {
+                let hasFollowupEvent = session.messages.indices.contains(where: { messageIndex in
+                    messageIndex > idx
+                    && session.messages[messageIndex].role == .system
+                    && !session.messages[messageIndex].content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                })
+                if hasFollowupEvent {
+                    session.messages.remove(at: idx)
+                } else {
+                    session.messages[idx].content = "(No response)"
+                }
+            }
+        }
+
+        if case .running = session.state {
+            session.state = .idle
+        }
+    }
+
     private func classifySystemEventKind(_ text: String) -> ChatMessage.Kind {
         let normalized = text.lowercased()
 
@@ -371,6 +393,79 @@ class ChatSessionViewModel: ObservableObject {
 
         User request:
         \(effectivePrompt)
+        """
+    }
+
+    private func updateChatHeadSymbolFromFirstMessage(prompt: String, attachments: [ChatAttachment]) {
+        guard chatHeadSymbolProcess == nil else { return }
+        guard let backend = backend, let path = backend.resolvedPath() else { return }
+
+        let seed = buildChatHeadSymbolSeed(userPrompt: prompt, attachments: attachments)
+        guard !seed.isEmpty else { return }
+
+        var generatedOutput = ""
+        let process = CLIProcessManager(
+            backend: backend,
+            executablePath: path,
+            model: session.selectedModel.cliValue,
+            prompt: buildChatHeadSymbolPrompt(from: seed),
+            imagePaths: attachments.filter(\.isImage).map(\.filePath),
+            sessionId: UUID().uuidString,
+            isResume: false,
+            workingDirectory: session.workspaceDirectory
+        )
+
+        process.onTextChunk = { text in
+            generatedOutput += text
+        }
+
+        process.onResult = { text in
+            generatedOutput = text
+        }
+
+        process.onComplete = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.session.updateChatHeadSymbol(from: generatedOutput)
+                self.chatHeadSymbolProcess = nil
+                self.notifyUpdate()
+            }
+        }
+
+        process.onError = { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.chatHeadSymbolProcess = nil
+            }
+        }
+
+        chatHeadSymbolProcess = process
+        process.start()
+    }
+
+    private func buildChatHeadSymbolSeed(userPrompt: String, attachments: [ChatAttachment]) -> String {
+        let trimmedPrompt = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedPrompt.isEmpty else { return trimmedPrompt }
+
+        guard !attachments.isEmpty else { return "" }
+        let attachmentSummary = attachments.map { attachment in
+            "\(attachment.isImage ? "image" : "file"): \(attachment.fileName)"
+        }.joined(separator: ", ")
+
+        return "Attachment-only first message with: \(attachmentSummary)"
+    }
+
+    private func buildChatHeadSymbolPrompt(from seed: String) -> String {
+        """
+        Choose the single best emoji to represent this chat based on the first user message.
+
+        Rules:
+        - Return exactly one emoji and nothing else.
+        - Prefer specific emojis over generic ones.
+        - Do not return any words, punctuation, Markdown, or explanation.
+        - If the request is broad or unclear, return \(ChatSession.defaultChatHeadSymbol).
+
+        First user message:
+        \(seed)
         """
     }
 
