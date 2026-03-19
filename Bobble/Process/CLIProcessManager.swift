@@ -4,6 +4,7 @@ class CLIProcessManager {
     private var process: Process?
     private let backend: CLIBackend
     private let executablePath: String
+    private let model: String?
     private let prompt: String
     private let imagePaths: [String]
     private let sessionId: String
@@ -23,6 +24,7 @@ class CLIProcessManager {
     init(
         backend: CLIBackend,
         executablePath: String,
+        model: String?,
         prompt: String,
         imagePaths: [String],
         sessionId: String,
@@ -31,6 +33,7 @@ class CLIProcessManager {
     ) {
         self.backend = backend
         self.executablePath = executablePath
+        self.model = model
         self.prompt = prompt
         self.imagePaths = imagePaths
         self.sessionId = sessionId
@@ -141,6 +144,7 @@ class CLIProcessManager {
 
     private func makeArguments() -> [String] {
         let imageArguments = imagePaths.flatMap { ["--image", $0] }
+        let modelArguments = model.map { ["--model", $0] } ?? []
 
         switch backend {
         case .claude:
@@ -161,6 +165,7 @@ class CLIProcessManager {
                 return [
                     "exec",
                     "resume",
+                ] + modelArguments + [
                     "--json",
                     "--skip-git-repo-check",
                     "--dangerously-bypass-approvals-and-sandbox",
@@ -172,6 +177,7 @@ class CLIProcessManager {
 
             return [
                 "exec",
+            ] + modelArguments + [
                 "--json",
                 "--skip-git-repo-check",
                 "--dangerously-bypass-approvals-and-sandbox",

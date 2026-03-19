@@ -38,12 +38,12 @@ struct ChatContentView: View {
                     .fill(DesignTokens.surfaceAccent)
                     .frame(width: 24, height: 24)
                     .overlay(
-                        Text(session.initial)
+                        Text(viewModel.session.initial)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(DesignTokens.textPrimary)
                     )
 
-                Text(session.name)
+                Text(viewModel.session.name)
                     .font(DesignTokens.headerFont)
                     .foregroundColor(DesignTokens.textPrimary)
                     .lineLimit(1)

@@ -3,6 +3,7 @@ import Foundation
 struct ChatSession: Identifiable {
     let id: UUID
     var name: String
+    var selectedModel: CodexModelOption
     var messages: [ChatMessage]
     var state: SessionState
     var cliSessionId: String
@@ -40,6 +41,7 @@ struct ChatSession: Identifiable {
         let newId = UUID()
         self.id = newId
         self.name = name
+        self.selectedModel = .default
         self.messages = []
         self.state = .idle
         self.cliSessionId = UUID().uuidString

@@ -59,6 +59,7 @@ class ChatSessionViewModel: ObservableObject {
         let pm = CLIProcessManager(
             backend: backend,
             executablePath: path,
+            model: session.selectedModel.cliValue,
             prompt: buildPrompt(userPrompt: prompt, attachments: attachments),
             imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: session.cliSessionId,
@@ -158,6 +159,12 @@ class ChatSessionViewModel: ObservableObject {
     func terminate() {
         processManager?.stop()
         processManager = nil
+    }
+
+    func selectModel(_ model: CodexModelOption) {
+        guard session.selectedModel != model else { return }
+        session.selectedModel = model
+        notifyUpdate()
     }
 
     func attachFiles(urls: [URL]) {

@@ -34,6 +34,14 @@ struct InputBarView: View {
                     .foregroundColor(DesignTokens.textSecondary)
             }
 
+            HStack {
+                ModelPickerMenu(selectedModel: viewModel.session.selectedModel) { model in
+                    viewModel.selectModel(model)
+                }
+
+                Spacer()
+            }
+
             HStack(spacing: 10) {
                 Button(action: selectAttachments) {
                     Image(systemName: "paperclip")
@@ -241,5 +249,55 @@ struct InputBarView: View {
             UTType.gif.identifier,
             UTType.image.identifier
         ]
+    }
+}
+
+struct ModelPickerMenu: View {
+    let selectedModel: CodexModelOption
+    let onSelect: (CodexModelOption) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(CodexModelOption.allCases) { model in
+                Button(action: { onSelect(model) }) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(model.displayName)
+                            Text(model.subtitle)
+                                .font(.system(size: 11))
+                                .foregroundColor(DesignTokens.textSecondary)
+                        }
+
+                        if model == selectedModel {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(selectedModel.displayName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundColor(DesignTokens.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(DesignTokens.surfaceAccent.opacity(0.32))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .help("Choose the Codex model for the next message")
     }
 }

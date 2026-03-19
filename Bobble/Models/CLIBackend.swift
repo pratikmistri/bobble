@@ -61,3 +61,76 @@ enum CLIBackend: String, CaseIterable {
         return nil
     }
 }
+
+enum CodexModelOption: String, CaseIterable, Identifiable {
+    case `default` = "default"
+    case gpt5Codex = "gpt-5-codex"
+    case gpt53Codex = "gpt-5.3-codex"
+    case gpt52Codex = "gpt-5.2-codex"
+    case gpt51Codex = "gpt-5.1-codex"
+    case gpt51CodexMax = "gpt-5.1-codex-max"
+    case gpt51CodexMini = "gpt-5.1-codex-mini"
+
+    var id: String { rawValue }
+
+    var cliValue: String? {
+        self == .default ? nil : rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .default:
+            return "Auto"
+        case .gpt5Codex:
+            return "GPT-5 Codex"
+        case .gpt53Codex:
+            return "GPT-5.3 Codex"
+        case .gpt52Codex:
+            return "GPT-5.2 Codex"
+        case .gpt51Codex:
+            return "GPT-5.1 Codex"
+        case .gpt51CodexMax:
+            return "GPT-5.1 Codex Max"
+        case .gpt51CodexMini:
+            return "GPT-5.1 Codex Mini"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .default:
+            return "Auto"
+        case .gpt5Codex:
+            return "5 Codex"
+        case .gpt53Codex:
+            return "5.3 Codex"
+        case .gpt52Codex:
+            return "5.2 Codex"
+        case .gpt51Codex:
+            return "5.1 Codex"
+        case .gpt51CodexMax:
+            return "5.1 Max"
+        case .gpt51CodexMini:
+            return "5.1 Mini"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .default:
+            return "Use the Codex CLI default model."
+        case .gpt5Codex:
+            return "General-purpose Codex-optimized coding model."
+        case .gpt53Codex:
+            return "Most capable current Codex model."
+        case .gpt52Codex:
+            return "Strong long-horizon coding model."
+        case .gpt51Codex:
+            return "Balanced GPT-5.1 coding model."
+        case .gpt51CodexMax:
+            return "GPT-5.1 Codex variant for longer-running tasks."
+        case .gpt51CodexMini:
+            return "Smaller, cheaper GPT-5.1 Codex variant."
+        }
+    }
+}
