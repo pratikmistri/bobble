@@ -241,6 +241,15 @@ struct AttachmentChipView: View {
     var onRemove: (() -> Void)? = nil
 
     var body: some View {
+        if removable, attachment.isImage {
+            RemovableImageAttachmentChipView(attachment: attachment, onRemove: onRemove)
+        } else {
+            standardChip
+        }
+    }
+
+    @ViewBuilder
+    private var standardChip: some View {
         let chip = HStack(spacing: 6) {
             Image(systemName: attachment.systemImageName)
                 .font(.system(size: 11, weight: .semibold))
@@ -284,6 +293,53 @@ struct AttachmentChipView: View {
 
     private func openAttachment() {
         NSWorkspace.shared.open(attachment.fileURL)
+    }
+}
+
+private struct RemovableImageAttachmentChipView: View {
+    let attachment: ChatAttachment
+    let onRemove: (() -> Void)?
+
+    private let thumbnailSize: CGFloat = 60
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let image = NSImage(contentsOf: attachment.fileURL) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(DesignTokens.surfaceColor.opacity(0.9))
+
+                        Image(systemName: attachment.systemImageName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(DesignTokens.textSecondary)
+                    }
+                }
+            }
+            .frame(width: thumbnailSize, height: thumbnailSize)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+            )
+
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white, Color.black.opacity(0.65))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 4, y: -4)
+            }
+        }
+        .frame(width: thumbnailSize, height: thumbnailSize)
+        .help(attachment.fileName)
     }
 }
 
