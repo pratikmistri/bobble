@@ -10,6 +10,15 @@ struct ChatContentView: View {
     @State private var headerAppeared = false
     @State private var contentAppeared = false
 
+    private var chronologicalMessages: [ChatMessage] {
+        viewModel.session.messages.sorted { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -55,7 +64,7 @@ struct ChatContentView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(viewModel.session.messages.enumerated()), id: \.element.id) { index, message in
+                        ForEach(Array(chronologicalMessages.enumerated()), id: \.element.id) { index, message in
                             MessageBubbleView(message: message, index: index)
                                 .id(message.id)
                         }
@@ -63,7 +72,7 @@ struct ChatContentView: View {
                     .padding(12)
                 }
                 .onChange(of: viewModel.session.messages.count) {
-                    if let lastId = viewModel.session.messages.last?.id {
+                    if let lastId = chronologicalMessages.last?.id {
                         withAnimation(DesignTokens.motionScroll) {
                             proxy.scrollTo(lastId, anchor: .bottom)
                         }

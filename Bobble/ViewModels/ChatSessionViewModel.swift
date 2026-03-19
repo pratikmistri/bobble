@@ -42,9 +42,6 @@ class ChatSessionViewModel: ObservableObject {
             return
         }
 
-        // Add streaming assistant message placeholder
-        let assistantMessage = ChatMessage(role: .assistant, content: "", isStreaming: true)
-        session.messages.append(assistantMessage)
         session.state = .running
         notifyUpdate()
 
@@ -61,20 +58,16 @@ class ChatSessionViewModel: ObservableObject {
         pm.onTextChunk = { [weak self] text in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
-                    let current = self.session.messages[idx].content
+                self.applyAssistantDelta(text)
+                self.notifyUpdate()
+            }
+        }
 
-                    // Some backends may emit both deltas and full snapshots. If we get a full
-                    // snapshot, replace instead of append to prevent duplicated text.
-                    if text == current {
-                        return
-                    } else if text.hasPrefix(current) {
-                        self.session.messages[idx].content = text
-                    } else {
-                        self.session.messages[idx].content += text
-                    }
-                    self.notifyUpdate()
-                }
+        pm.onResult = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.completeAssistantMessage(with: text)
+                self.notifyUpdate()
             }
         }
 
@@ -123,6 +116,14 @@ class ChatSessionViewModel: ObservableObject {
             }
         }
 
+        pm.onAssistantMessageStarted = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.startAssistantMessageIfNeeded()
+                self.notifyUpdate()
+            }
+        }
+
         pm.onError = { [weak self] error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -149,5 +150,48 @@ class ChatSessionViewModel: ObservableObject {
     private func notifyUpdate() {
         objectWillChange.send()
         onSessionUpdated?(session)
+    }
+
+    private func startAssistantMessageIfNeeded() {
+        if session.messages.contains(where: { $0.role == .assistant && $0.isStreaming }) {
+            return
+        }
+        session.messages.append(ChatMessage(role: .assistant, content: "", isStreaming: true))
+    }
+
+    private func applyAssistantDelta(_ text: String) {
+        guard !text.isEmpty else { return }
+        startAssistantMessageIfNeeded()
+
+        guard let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) else {
+            return
+        }
+
+        let current = session.messages[idx].content
+        // Some backends may emit both deltas and full snapshots. If we get a full
+        // snapshot, replace instead of append to prevent duplicated text.
+        if text == current {
+            return
+        } else if text.hasPrefix(current) {
+            session.messages[idx].content = text
+        } else {
+            session.messages[idx].content += text
+        }
+    }
+
+    private func completeAssistantMessage(with text: String) {
+        if let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+            if !text.isEmpty {
+                session.messages[idx].content = text
+            }
+            session.messages[idx].isStreaming = false
+            if session.messages[idx].content.isEmpty {
+                session.messages.remove(at: idx)
+            }
+            return
+        }
+
+        guard !text.isEmpty else { return }
+        session.messages.append(ChatMessage(role: .assistant, content: text))
     }
 }

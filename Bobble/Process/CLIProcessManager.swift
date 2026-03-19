@@ -11,10 +11,12 @@ class CLIProcessManager {
     private let parser: StreamParser
 
     var onTextChunk: ((String) -> Void)?
+    var onResult: ((String) -> Void)?
     var onEventText: ((String) -> Void)?
     var onComplete: (() -> Void)?
     var onError: ((String) -> Void)?
     var onSessionId: ((String) -> Void)?
+    var onAssistantMessageStarted: (() -> Void)?
 
     init(
         backend: CLIBackend,
@@ -72,7 +74,7 @@ class CLIProcessManager {
         }
 
         parser.onResult = { [weak self] text in
-            self?.onTextChunk?(text)
+            self?.onResult?(text)
         }
 
         parser.onEventText = { [weak self] text in
@@ -81,6 +83,10 @@ class CLIProcessManager {
 
         parser.onSessionId = { [weak self] id in
             self?.onSessionId?(id)
+        }
+
+        parser.onAssistantMessageStarted = { [weak self] in
+            self?.onAssistantMessageStarted?()
         }
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
