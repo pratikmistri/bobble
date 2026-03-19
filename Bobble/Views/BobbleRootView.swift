@@ -4,6 +4,7 @@ struct BobbleRootView: View {
     @ObservedObject var manager: ChatHeadsManager
     let onHeadTapped: (ChatSession) -> Void
     let onClose: () -> Void
+    let onRemoveSession: (ChatSession) -> Void
     let onAddSession: () -> Void
     let onHeadsDragChanged: () -> Void
     let onHeadsDragEnded: () -> Void
@@ -61,9 +62,11 @@ struct BobbleRootView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
             // MARK: – Chat window (above heads, expands upward into the screen)
-            if let sessionId = manager.expandedSessionId,
+            if let sessionId = manager.expandedSessionId ?? manager.closingSessionId,
                let session = manager.sessions.first(where: { $0.id == sessionId }),
                let viewModel = manager.viewModel(for: sessionId) {
+                let isClosingWindow = manager.closingSessionId == sessionId && manager.expandedSessionId == nil
+                let isDeletingExpandedSession = manager.deletingSessionId == sessionId
 
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
@@ -71,18 +74,27 @@ struct BobbleRootView: View {
 
                     ZStack {
                         // Background — matchedGeometryEffect morphs the head circle into this rect
-                        RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                            .fill(DesignTokens.surfaceColor)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                                    .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
-                            )
-                            .matchedGeometryEffect(
-                                id: session.id,
-                                in: morphNamespace,
-                                properties: .frame,
-                                anchor: .bottomTrailing
-                            )
+                        if isClosingWindow {
+                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                .fill(DesignTokens.surfaceColor)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                        .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                .fill(DesignTokens.surfaceColor)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                        .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+                                )
+                                .matchedGeometryEffect(
+                                    id: session.id,
+                                    in: morphNamespace,
+                                    properties: .frame,
+                                    anchor: .bottomTrailing
+                                )
+                        }
 
                         // Chat content
                         ChatContentView(
@@ -92,9 +104,7 @@ struct BobbleRootView: View {
                             onClose: onClose,
                             onMarkRead: { manager.markRead(sessionId: sessionId) },
                             onRemove: {
-                                withAnimation(DesignTokens.motionLayout) {
-                                    manager.removeSession(session)
-                                }
+                                onRemoveSession(session)
                             }
                         )
                     }
@@ -102,6 +112,13 @@ struct BobbleRootView: View {
                     .shadow(color: .black.opacity(0.15), radius: DesignTokens.panelShadowRadius)
                     .frame(width: chatWidth, height: chatHeight)
                 }
+                .frame(height: (isDeletingExpandedSession || isClosingWindow) ? 0 : chatHeight, alignment: .top)
+                .clipped()
+                .opacity((isDeletingExpandedSession || isClosingWindow) ? 0 : 1)
+                .animation(DesignTokens.motionLayout, value: isDeletingExpandedSession)
+                .animation(DesignTokens.motionFade, value: isDeletingExpandedSession)
+                .animation(DesignTokens.motionLayout, value: isClosingWindow)
+                .animation(DesignTokens.motionFade, value: isClosingWindow)
             }
 
             // MARK: – Heads section (anchored at bottom-right of screen)

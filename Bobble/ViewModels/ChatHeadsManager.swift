@@ -9,6 +9,8 @@ class ChatHeadsManager: ObservableObject {
             syncSelectedProviderFromExpandedSession()
         }
     }
+    @Published var closingSessionId: UUID?
+    @Published var deletingSessionId: UUID?
     @Published var selectedProvider: CLIBackend = .codex {
         didSet {
             onSelectedProviderChanged?(selectedProvider)
@@ -105,6 +107,12 @@ class ChatHeadsManager: ObservableObject {
         viewModels[session.id]?.terminate()
         viewModels.removeValue(forKey: session.id)
         sessions.removeAll { $0.id == session.id }
+        if closingSessionId == session.id {
+            closingSessionId = nil
+        }
+        if deletingSessionId == session.id {
+            deletingSessionId = nil
+        }
         if expandedSessionId == session.id {
             expandedSessionId = nil
         }

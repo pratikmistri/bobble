@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private enum PanelAnimationMode: Equatable {
+        case fullFrame
+        case verticalCollapse
+    }
+
     private var mainPanel: FloatingPanel!
     private let manager = ChatHeadsManager()
     private let positionManager = WindowPositionManager()
@@ -19,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var tossVelocity = CGVector.zero
     private var physicsTimer: Timer?
     private var lastPhysicsStepTime: TimeInterval?
+    private var suppressNextPanelSizeUpdate = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBarItem()
@@ -146,6 +152,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onClose: { [weak self] in
                 self?.collapseSession()
             },
+            onRemoveSession: { [weak self] session in
+                self?.removeSession(session)
+            },
             onAddSession: { [weak self] in
                 self?.manager.addSession()
             },
@@ -172,7 +181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Deferred so it doesn't race with expandSession
         manager.onSessionsChanged = { [weak self] _ in
             DispatchQueue.main.async {
-                self?.updatePanelSize()
+                self?.handleSessionsChanged()
             }
         }
 
@@ -228,46 +237,116 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func collapseSession() {
-        guard manager.expandedSessionId != nil, !isCollapsingSession else { return }
+        guard let expandedSessionId = manager.expandedSessionId, !isCollapsingSession else { return }
         stopPhysics()
         isCollapsingSession = true
 
         let size = positionManager.collapsedPanelSize(count: max(manager.sessions.count, 1))
 
-        // Collapse content and panel frame on the same motion curve for a connected transition.
+        // Keep the closing view alive long enough to animate it in place instead of
+        // morphing the panel background into the returning head.
         withAnimation(DesignTokens.motionLayout) {
+            manager.closingSessionId = expandedSessionId
             manager.expandedSessionId = nil
         }
-        animatePanelFrame(to: size, duration: 0.34) { [weak self] in
-            self?.isCollapsingSession = false
+        animatePanelFrame(to: size, duration: 0.34, mode: .verticalCollapse) { [weak self] in
+            guard let self else { return }
+            self.manager.closingSessionId = nil
+            self.isCollapsingSession = false
         }
     }
 
     // MARK: - Panel sizing
 
+    private func handleSessionsChanged() {
+        if suppressNextPanelSizeUpdate {
+            suppressNextPanelSizeUpdate = false
+            return
+        }
+        updatePanelSize()
+    }
+
+    private func removeSession(_ session: ChatSession) {
+        guard manager.expandedSessionId == session.id else {
+            withAnimation(DesignTokens.motionFade) {
+                manager.removeSession(session)
+            }
+            return
+        }
+
+        guard !isCollapsingSession else { return }
+        stopPhysics()
+        isCollapsingSession = true
+
+        let remainingCount = max(manager.sessions.count - 1, 0)
+        let size = positionManager.collapsedPanelSize(count: remainingCount)
+
+        withAnimation(DesignTokens.motionLayout) {
+            manager.deletingSessionId = session.id
+        }
+
+        animatePanelFrame(to: size, duration: 0.22, mode: .verticalCollapse) { [weak self] in
+            guard let self else { return }
+
+            self.suppressNextPanelSizeUpdate = true
+            self.manager.removeSession(session)
+
+            let finalSize = self.positionManager.collapsedPanelSize(count: self.manager.sessions.count)
+            self.panelAnchor = self.positionManager.constrainedPanelAnchor(self.panelAnchor, for: finalSize)
+            let finalOrigin = self.positionManager.panelOrigin(for: finalSize, anchor: self.panelAnchor)
+            self.mainPanel.setFrame(NSRect(origin: finalOrigin, size: finalSize), display: true)
+            self.isCollapsingSession = false
+        }
+    }
+
     private func updatePanelSize() {
         stopPhysics()
-        let count = max(manager.sessions.count, 1)
         let size: NSSize
         if manager.expandedSessionId != nil {
-            size = positionManager.expandedPanelSize(headsCount: count)
+            size = positionManager.expandedPanelSize(headsCount: max(manager.sessions.count, 1))
         } else {
-            size = positionManager.collapsedPanelSize(count: count)
+            size = positionManager.collapsedPanelSize(count: manager.sessions.count)
         }
         animatePanelFrame(to: size, duration: 0.35)
     }
 
-    private func animatePanelFrame(to size: NSSize, duration: TimeInterval, completion: (() -> Void)? = nil) {
-        panelAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size)
-        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor)
+    private func animatePanelFrame(
+        to size: NSSize,
+        duration: TimeInterval,
+        mode: PanelAnimationMode = .fullFrame,
+        completion: (() -> Void)? = nil
+    ) {
+        let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size)
+        let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor)
+        let finalFrame = NSRect(origin: finalOrigin, size: size)
+        let animatedFrame: NSRect
+
+        switch mode {
+        case .fullFrame:
+            panelAnchor = resolvedAnchor
+            animatedFrame = finalFrame
+        case .verticalCollapse:
+            let currentFrame = mainPanel.frame
+            animatedFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: currentFrame.origin.y,
+                width: currentFrame.size.width,
+                height: size.height
+            )
+        }
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
             mainPanel.animator().setFrame(
-                NSRect(origin: origin, size: size),
+                animatedFrame,
                 display: true
             )
         } completionHandler: {
+            if mode != .fullFrame {
+                self.panelAnchor = resolvedAnchor
+                self.mainPanel.setFrame(finalFrame, display: true)
+            }
             completion?()
         }
     }

@@ -17,7 +17,7 @@ class FloatingPanel: NSPanel {
         hasShadow = false
         hidesOnDeactivate = false
         isMovableByWindowBackground = false
-        animationBehavior = .utilityWindow
+        animationBehavior = .none
         isReleasedWhenClosed = false
 
         let hostingView = NSHostingView(rootView: contentView)
