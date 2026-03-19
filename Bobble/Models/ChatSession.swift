@@ -24,6 +24,13 @@ struct ChatSession: Identifiable {
         return last.role == .assistant && last.isNew
     }
 
+    var attachmentsDirectory: String {
+        let directoryURL = URL(fileURLWithPath: workspaceDirectory, isDirectory: true)
+            .appendingPathComponent("attachments", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        return directoryURL.path
+    }
+
     init(name: String = "New Chat") {
         let newId = UUID()
         self.id = newId

@@ -1,9 +1,13 @@
+import AppKit
 import Foundation
 import Combine
+import UniformTypeIdentifiers
 
 class ChatSessionViewModel: ObservableObject {
     @Published var session: ChatSession
     @Published var inputText: String = ""
+    @Published var pendingAttachments: [ChatAttachment] = []
+    @Published var isCapturingScreenshot = false
 
     var onSessionUpdated: ((ChatSession) -> Void)?
 
@@ -18,16 +22,20 @@ class ChatSessionViewModel: ObservableObject {
 
     func send() {
         let prompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
+        let attachments = pendingAttachments
+        guard !prompt.isEmpty || !attachments.isEmpty else { return }
+
         inputText = ""
+        pendingAttachments = []
 
         // Auto-name from first prompt
         if session.messages.isEmpty {
-            let truncated = String(prompt.prefix(30))
+            let seed = prompt.isEmpty ? (attachments.first?.fileName ?? "New Chat") : prompt
+            let truncated = String(seed.prefix(30))
             session.name = truncated
         }
 
-        let userMessage = ChatMessage(role: .user, content: prompt)
+        let userMessage = ChatMessage(role: .user, content: prompt, attachments: attachments)
         session.messages.append(userMessage)
         notifyUpdate()
 
@@ -48,7 +56,8 @@ class ChatSessionViewModel: ObservableObject {
         let pm = CLIProcessManager(
             backend: backend,
             executablePath: path,
-            prompt: prompt,
+            prompt: buildPrompt(userPrompt: prompt, attachments: attachments),
+            imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: session.cliSessionId,
             isResume: session.messages.filter({ $0.role == .user }).count > 1,
             workingDirectory: session.workspaceDirectory
@@ -148,6 +157,74 @@ class ChatSessionViewModel: ObservableObject {
         processManager = nil
     }
 
+    func attachFiles(urls: [URL]) {
+        for url in urls {
+            do {
+                let attachment = try makeAttachment(from: url)
+                if !pendingAttachments.contains(where: { $0.filePath == attachment.filePath }) {
+                    pendingAttachments.append(attachment)
+                }
+            } catch {
+                appendAttachmentError("Couldn't attach \(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func attachImageData(_ data: Data, suggestedName: String?) {
+        do {
+            let attachment = try makeImageAttachment(from: data, suggestedName: suggestedName)
+            pendingAttachments.append(attachment)
+        } catch {
+            appendAttachmentError("Couldn't attach dropped image: \(error.localizedDescription)")
+        }
+    }
+
+    func removePendingAttachment(id: UUID) {
+        pendingAttachments.removeAll { $0.id == id }
+    }
+
+    func captureScreenshot() {
+        guard !isCapturingScreenshot else { return }
+        isCapturingScreenshot = true
+
+        let fileName = makeUniqueFileName(baseName: "screenshot-\(timestampSlug())", pathExtension: "png")
+        let destination = attachmentsDirectoryURL.appendingPathComponent(fileName, isDirectory: false)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-i", "-x", destination.path]
+
+        process.terminationHandler = { [weak self] proc in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isCapturingScreenshot = false
+
+                guard proc.terminationStatus == 0 else {
+                    try? FileManager.default.removeItem(at: destination)
+                    return
+                }
+
+                guard FileManager.default.fileExists(atPath: destination.path) else {
+                    return
+                }
+
+                let attachment = self.makeStoredAttachment(
+                    kind: .image,
+                    fileName: destination.lastPathComponent,
+                    storedURL: destination
+                )
+                self.pendingAttachments.append(attachment)
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            isCapturingScreenshot = false
+            appendAttachmentError("Couldn't start screenshot capture: \(error.localizedDescription)")
+        }
+    }
+
     private func notifyUpdate() {
         objectWillChange.send()
         onSessionUpdated?(session)
@@ -230,5 +307,115 @@ class ChatSessionViewModel: ObservableObject {
         }
 
         return .regular
+    }
+
+    private func buildPrompt(userPrompt: String, attachments: [ChatAttachment]) -> String {
+        guard !attachments.isEmpty else { return userPrompt }
+
+        let attachmentLines = attachments.map { attachment in
+            "- \(attachment.isImage ? "image" : "file"): \(attachment.relativePath)"
+        }.joined(separator: "\n")
+
+        let effectivePrompt = userPrompt.isEmpty
+            ? "Inspect the attachments and respond appropriately. If the intended task is unclear, summarize what was attached and ask one focused clarifying question."
+            : userPrompt
+
+        return """
+        The user attached the following workspace files for this message:
+        \(attachmentLines)
+
+        Use those paths when you need to inspect the attachments.
+
+        User request:
+        \(effectivePrompt)
+        """
+    }
+
+    private func appendAttachmentError(_ message: String) {
+        session.messages.append(ChatMessage(role: .error, content: message))
+        notifyUpdate()
+    }
+
+    private func makeAttachment(from sourceURL: URL) throws -> ChatAttachment {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: sourceURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            throw NSError(domain: "BobbleAttachment", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Only files can be attached."
+            ])
+        }
+
+        let sourceExtension = sourceURL.pathExtension
+        let baseName = sourceURL.deletingPathExtension().lastPathComponent
+        let storedFileName = makeUniqueFileName(baseName: baseName, pathExtension: sourceExtension)
+        let destinationURL = attachmentsDirectoryURL.appendingPathComponent(storedFileName, isDirectory: false)
+
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+
+        let kind: ChatAttachment.Kind = isImageFile(url: sourceURL) ? .image : .file
+        return makeStoredAttachment(kind: kind, fileName: sourceURL.lastPathComponent, storedURL: destinationURL)
+    }
+
+    private func makeImageAttachment(from data: Data, suggestedName: String?) throws -> ChatAttachment {
+        let normalizedData = normalizedPNGData(from: data) ?? data
+        let requestedBaseName = suggestedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseName = (requestedBaseName?.isEmpty == false ? requestedBaseName! : "dropped-image")
+            .replacingOccurrences(of: ".png", with: "")
+        let storedFileName = makeUniqueFileName(baseName: baseName, pathExtension: "png")
+        let destinationURL = attachmentsDirectoryURL.appendingPathComponent(storedFileName, isDirectory: false)
+        try normalizedData.write(to: destinationURL, options: .atomic)
+        return makeStoredAttachment(kind: .image, fileName: storedFileName, storedURL: destinationURL)
+    }
+
+    private func makeStoredAttachment(kind: ChatAttachment.Kind, fileName: String, storedURL: URL) -> ChatAttachment {
+        ChatAttachment(
+            kind: kind,
+            fileName: fileName,
+            filePath: storedURL.path,
+            relativePath: "attachments/\(storedURL.lastPathComponent)"
+        )
+    }
+
+    private func isImageFile(url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension) else {
+            return false
+        }
+        return type.conforms(to: .image)
+    }
+
+    private func makeUniqueFileName(baseName: String, pathExtension: String) -> String {
+        let sanitizedBaseName = sanitizeFileComponent(baseName)
+        let sanitizedExtension = sanitizeFileComponent(pathExtension)
+        let uniqueSuffix = UUID().uuidString.prefix(8)
+        if sanitizedExtension.isEmpty {
+            return "\(sanitizedBaseName)-\(uniqueSuffix)"
+        }
+        return "\(sanitizedBaseName)-\(uniqueSuffix).\(sanitizedExtension)"
+    }
+
+    private func sanitizeFileComponent(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let scalars = value.unicodeScalars.map { allowed.contains($0) ? String($0) : "-" }
+        let sanitized = scalars.joined()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return sanitized.isEmpty ? "attachment" : sanitized
+    }
+
+    private func timestampSlug() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: Date())
+    }
+
+    private var attachmentsDirectoryURL: URL {
+        URL(fileURLWithPath: session.attachmentsDirectory, isDirectory: true)
+    }
+
+    private func normalizedPNGData(from data: Data) -> Data? {
+        guard let image = NSImage(data: data),
+              let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData) else {
+            return nil
+        }
+        return bitmap.representation(using: .png, properties: [:])
     }
 }

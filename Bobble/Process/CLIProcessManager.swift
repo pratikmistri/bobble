@@ -5,10 +5,12 @@ class CLIProcessManager {
     private let backend: CLIBackend
     private let executablePath: String
     private let prompt: String
+    private let imagePaths: [String]
     private let sessionId: String
     private let isResume: Bool
     private let workingDirectory: String
     private let parser: StreamParser
+    private let usesStdinPrompt: Bool
 
     var onTextChunk: ((String) -> Void)?
     var onResult: ((String) -> Void)?
@@ -22,6 +24,7 @@ class CLIProcessManager {
         backend: CLIBackend,
         executablePath: String,
         prompt: String,
+        imagePaths: [String],
         sessionId: String,
         isResume: Bool,
         workingDirectory: String
@@ -29,10 +32,12 @@ class CLIProcessManager {
         self.backend = backend
         self.executablePath = executablePath
         self.prompt = prompt
+        self.imagePaths = imagePaths
         self.sessionId = sessionId
         self.isResume = isResume
         self.workingDirectory = workingDirectory
         self.parser = StreamParser(backend: backend)
+        self.usesStdinPrompt = backend == .codex
     }
 
     func start() {
@@ -66,8 +71,12 @@ class CLIProcessManager {
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        if usesStdinPrompt {
+            process.standardInput = stdinPipe
+        }
 
         parser.onTextDelta = { [weak self] text in
             self?.onTextChunk?(text)
@@ -115,6 +124,9 @@ class CLIProcessManager {
 
         do {
             try process.run()
+            if usesStdinPrompt {
+                writePromptToStdin(using: stdinPipe)
+            }
         } catch {
             onError?("Failed to launch CLI: \(error.localizedDescription)")
         }
@@ -128,6 +140,8 @@ class CLIProcessManager {
     }
 
     private func makeArguments() -> [String] {
+        let imageArguments = imagePaths.flatMap { ["--image", $0] }
+
         switch backend {
         case .claude:
             var args = [
@@ -150,8 +164,9 @@ class CLIProcessManager {
                     "--json",
                     "--skip-git-repo-check",
                     "--dangerously-bypass-approvals-and-sandbox",
+                ] + imageArguments + [
                     sessionId,
-                    prompt
+                    "-"
                 ]
             }
 
@@ -162,8 +177,15 @@ class CLIProcessManager {
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--cd",
                 workingDirectory,
-                prompt
+            ] + imageArguments + [
+                "-"
             ]
         }
+    }
+
+    private func writePromptToStdin(using pipe: Pipe) {
+        let data = Data(prompt.utf8)
+        pipe.fileHandleForWriting.write(data)
+        pipe.fileHandleForWriting.closeFile()
     }
 }
