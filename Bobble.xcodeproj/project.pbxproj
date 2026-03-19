@@ -1,0 +1,374 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000001 /* BobbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000001; };
+		A10000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000002; };
+		A10000003 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000003; };
+		A10000004 /* WindowPositionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000004; };
+		A10000005 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000005; };
+		A10000006 /* ChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000006; };
+		A10000007 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000007; };
+		A10000008 /* CLIBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000008; };
+		A10000009 /* ChatHeadsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000009; };
+		A10000010 /* ChatSessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010; };
+		A10000011 /* CLIProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000011; };
+		A10000012 /* StreamParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012; };
+		A10000013 /* ChatHeadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000013; };
+		A10000014 /* ChatHeadStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000014; };
+		A10000015 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000015; };
+		A10000016 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000016; };
+		A10000017 /* InputBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000017; };
+		A10000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000018; };
+		A10000019 /* BobbleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B10000001 /* BobbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BobbleApp.swift; sourceTree = "<group>"; };
+		B10000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B10000003 /* FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanel.swift; sourceTree = "<group>"; };
+		B10000004 /* WindowPositionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPositionManager.swift; sourceTree = "<group>"; };
+		B10000005 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		B10000006 /* ChatSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSession.swift; sourceTree = "<group>"; };
+		B10000007 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
+		B10000008 /* CLIBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIBackend.swift; sourceTree = "<group>"; };
+		B10000009 /* ChatHeadsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadsManager.swift; sourceTree = "<group>"; };
+		B10000010 /* ChatSessionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionViewModel.swift; sourceTree = "<group>"; };
+		B10000011 /* CLIProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIProcessManager.swift; sourceTree = "<group>"; };
+		B10000012 /* StreamParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamParser.swift; sourceTree = "<group>"; };
+		B10000013 /* ChatHeadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadView.swift; sourceTree = "<group>"; };
+		B10000014 /* ChatHeadStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadStackView.swift; sourceTree = "<group>"; };
+		B10000015 /* ChatWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWindowView.swift; sourceTree = "<group>"; };
+		B10000016 /* MessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleView.swift; sourceTree = "<group>"; };
+		B10000017 /* InputBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputBarView.swift; sourceTree = "<group>"; };
+		B10000018 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10000019 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000020 /* Bobble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bobble.entitlements; sourceTree = "<group>"; };
+		B10000021 /* BobbleRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BobbleRootView.swift; sourceTree = "<group>"; };
+		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D10000001 = {
+			isa = PBXGroup;
+			children = (
+				D10000002 /* Bobble */,
+				D10000099 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000002 /* Bobble */ = {
+			isa = PBXGroup;
+			children = (
+				B10000001 /* BobbleApp.swift */,
+				B10000002 /* AppDelegate.swift */,
+				B10000019 /* Info.plist */,
+				B10000020 /* Bobble.entitlements */,
+				D10000003 /* Models */,
+				D10000004 /* ViewModels */,
+				D10000005 /* Process */,
+				D10000006 /* Views */,
+				D10000007 /* Windows */,
+				D10000008 /* Utilities */,
+				D10000009 /* Resources */,
+			);
+			path = Bobble;
+			sourceTree = "<group>";
+		};
+		D10000003 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B10000006 /* ChatSession.swift */,
+				B10000007 /* ChatMessage.swift */,
+				B10000008 /* CLIBackend.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		D10000004 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B10000009 /* ChatHeadsManager.swift */,
+				B10000010 /* ChatSessionViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		D10000005 /* Process */ = {
+			isa = PBXGroup;
+			children = (
+				B10000011 /* CLIProcessManager.swift */,
+				B10000012 /* StreamParser.swift */,
+			);
+			path = Process;
+			sourceTree = "<group>";
+		};
+		D10000006 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10000013 /* ChatHeadView.swift */,
+				B10000014 /* ChatHeadStackView.swift */,
+				B10000015 /* ChatWindowView.swift */,
+				B10000016 /* MessageBubbleView.swift */,
+				B10000017 /* InputBarView.swift */,
+				B10000021 /* BobbleRootView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		D10000007 /* Windows */ = {
+			isa = PBXGroup;
+			children = (
+				B10000003 /* FloatingPanel.swift */,
+				B10000004 /* WindowPositionManager.swift */,
+			);
+			path = Windows;
+			sourceTree = "<group>";
+		};
+		D10000008 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				B10000005 /* DesignTokens.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		D10000009 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000018 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D10000099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000099 /* Bobble.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000001 /* Bobble */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000003 /* Build configuration list for PBXNativeTarget "Bobble" */;
+			buildPhases = (
+				E10000002 /* Sources */,
+				C10000001 /* Frameworks */,
+				E10000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Bobble;
+			productName = Bobble;
+			productReference = B10000099 /* Bobble.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F10000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = F10000002 /* Build configuration list for PBXProject "Bobble" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D10000001;
+			productRefGroup = D10000099 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000001 /* Bobble */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E10000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000018 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E10000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000001 /* BobbleApp.swift in Sources */,
+				A10000002 /* AppDelegate.swift in Sources */,
+				A10000003 /* FloatingPanel.swift in Sources */,
+				A10000004 /* WindowPositionManager.swift in Sources */,
+				A10000005 /* DesignTokens.swift in Sources */,
+				A10000006 /* ChatSession.swift in Sources */,
+				A10000007 /* ChatMessage.swift in Sources */,
+				A10000008 /* CLIBackend.swift in Sources */,
+				A10000009 /* ChatHeadsManager.swift in Sources */,
+				A10000010 /* ChatSessionViewModel.swift in Sources */,
+				A10000011 /* CLIProcessManager.swift in Sources */,
+				A10000012 /* StreamParser.swift in Sources */,
+				A10000013 /* ChatHeadView.swift in Sources */,
+				A10000014 /* ChatHeadStackView.swift in Sources */,
+				A10000015 /* ChatWindowView.swift in Sources */,
+				A10000016 /* MessageBubbleView.swift in Sources */,
+				A10000017 /* InputBarView.swift in Sources */,
+				A10000019 /* BobbleRootView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		G10000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		G10000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		G10000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Bobble/Bobble.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Bobble/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bobble.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		G10000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Bobble/Bobble.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Bobble/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bobble.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000002 /* Build configuration list for PBXProject "Bobble" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000001 /* Debug */,
+				G10000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000003 /* Build configuration list for PBXNativeTarget "Bobble" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000003 /* Debug */,
+				G10000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = F10000001 /* Project object */;
+}

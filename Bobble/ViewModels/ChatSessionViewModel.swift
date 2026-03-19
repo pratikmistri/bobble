@@ -1,0 +1,153 @@
+import Foundation
+import Combine
+
+class ChatSessionViewModel: ObservableObject {
+    @Published var session: ChatSession
+    @Published var inputText: String = ""
+
+    var onSessionUpdated: ((ChatSession) -> Void)?
+
+    private let backend: CLIBackend?
+    private var processManager: CLIProcessManager?
+    private var cancellables = Set<AnyCancellable>()
+
+    init(session: ChatSession, backend: CLIBackend?) {
+        self.session = session
+        self.backend = backend
+    }
+
+    func send() {
+        let prompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return }
+        inputText = ""
+
+        // Auto-name from first prompt
+        if session.messages.isEmpty {
+            let truncated = String(prompt.prefix(30))
+            session.name = truncated
+        }
+
+        let userMessage = ChatMessage(role: .user, content: prompt)
+        session.messages.append(userMessage)
+        notifyUpdate()
+
+        guard let backend = backend, let path = backend.resolvedPath() else {
+            let errorMsg = ChatMessage(
+                role: .error,
+                content: "Codex CLI not found. Install with `npm install -g @openai/codex`."
+            )
+            session.messages.append(errorMsg)
+            session.state = .error("CLI not found")
+            notifyUpdate()
+            return
+        }
+
+        // Add streaming assistant message placeholder
+        let assistantMessage = ChatMessage(role: .assistant, content: "", isStreaming: true)
+        session.messages.append(assistantMessage)
+        session.state = .running
+        notifyUpdate()
+
+        let pm = CLIProcessManager(
+            backend: backend,
+            executablePath: path,
+            prompt: prompt,
+            sessionId: session.cliSessionId,
+            isResume: session.messages.filter({ $0.role == .user }).count > 1,
+            workingDirectory: session.workspaceDirectory
+        )
+        self.processManager = pm
+
+        pm.onTextChunk = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+                    let current = self.session.messages[idx].content
+
+                    // Some backends may emit both deltas and full snapshots. If we get a full
+                    // snapshot, replace instead of append to prevent duplicated text.
+                    if text == current {
+                        return
+                    } else if text.hasPrefix(current) {
+                        self.session.messages[idx].content = text
+                    } else {
+                        self.session.messages[idx].content += text
+                    }
+                    self.notifyUpdate()
+                }
+            }
+        }
+
+        pm.onEventText = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                self.session.messages.append(ChatMessage(role: .system, content: trimmed))
+                self.notifyUpdate()
+            }
+        }
+
+        pm.onComplete = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+                    self.session.messages[idx].isStreaming = false
+                    // If empty response, add a note
+                    if self.session.messages[idx].content.isEmpty {
+                        let hasFollowupEvent = self.session.messages.indices.contains(where: { messageIndex in
+                            messageIndex > idx
+                            && self.session.messages[messageIndex].role == .system
+                            && !self.session.messages[messageIndex].content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        })
+                        if hasFollowupEvent {
+                            self.session.messages.remove(at: idx)
+                        } else {
+                            self.session.messages[idx].content = "(No response)"
+                        }
+                    }
+                }
+                self.session.state = .idle
+                self.processManager = nil
+                self.notifyUpdate()
+            }
+        }
+
+        pm.onSessionId = { [weak self] newId in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if self.session.cliSessionId != newId {
+                    self.session.cliSessionId = newId
+                    self.notifyUpdate()
+                }
+            }
+        }
+
+        pm.onError = { [weak self] error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                // Remove the empty streaming message
+                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+                    self.session.messages.remove(at: idx)
+                }
+                let errorMsg = ChatMessage(role: .error, content: error)
+                self.session.messages.append(errorMsg)
+                self.session.state = .error(error)
+                self.processManager = nil
+                self.notifyUpdate()
+            }
+        }
+
+        pm.start()
+    }
+
+    func terminate() {
+        processManager?.stop()
+        processManager = nil
+    }
+
+    private func notifyUpdate() {
+        objectWillChange.send()
+        onSessionUpdated?(session)
+    }
+}
