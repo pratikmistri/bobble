@@ -204,6 +204,14 @@ class StreamParser {
             return title
         }
 
+        if itemTypeKey.contains("reasoning") || itemTypeKey.contains("thought") {
+            let title = "Agent thought"
+            if let body = compactJSON(item) {
+                return "\(title)\nDetails:\n\(body)"
+            }
+            return title
+        }
+
         return nil
     }
 
@@ -218,6 +226,14 @@ class StreamParser {
             || eventKey == "error"
             || eventKey == "turn.failed" {
             let title = "Codex \(humanize(type))"
+            if let body = compactJSON(payload) {
+                return "\(title)\nDetails:\n\(body)"
+            }
+            return title
+        }
+
+        if eventKey.contains("reasoning") || eventKey.contains("thought") {
+            let title = "Agent thought"
             if let body = compactJSON(payload) {
                 return "\(title)\nDetails:\n\(body)"
             }

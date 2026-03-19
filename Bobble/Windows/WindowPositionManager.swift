@@ -3,6 +3,7 @@ import AppKit
 struct WindowPositionManager {
     private let headDiameter: CGFloat = DesignTokens.headDiameter
     private let headSpacing: CGFloat = DesignTokens.headSpacing
+    private let headVisualPadding: CGFloat = DesignTokens.headVisualPadding
     private let screenMargin: CGFloat = DesignTokens.screenMargin
     private let chatWidth: CGFloat = 320
     private let chatHeight: CGFloat = 480
@@ -13,9 +14,13 @@ struct WindowPositionManager {
     func collapsedPanelSize(count: Int) -> NSSize {
         let totalHeads = count + 1 // +1 for add button
         let inset = DesignTokens.headInset * 2
+        let stackVisualOverflow = count > 0 ? headVisualPadding * 2 : 0
         let height = CGFloat(totalHeads) * headDiameter
-            + CGFloat(totalHeads - 1) * headSpacing + inset
-        return NSSize(width: headDiameter + inset, height: height)
+            + CGFloat(totalHeads - 1) * headSpacing
+            + stackVisualOverflow
+            + inset
+        let headsWidth = headDiameter + stackVisualOverflow
+        return NSSize(width: headsWidth + inset, height: height)
     }
 
     // MARK: - Expanded state (deck of heads + chat window)
@@ -27,7 +32,7 @@ struct WindowPositionManager {
         // Heads section: add button + deck of non-expanded heads
         let addH = headDiameter
         let deckH = nonExpanded > 0
-            ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset
+            ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset + (headVisualPadding * 2)
             : 0
         let headsGap = nonExpanded > 0 ? headSpacing : 0
         let headsSection = inset + addH + headsGap + deckH

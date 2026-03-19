@@ -13,6 +13,7 @@ struct BobbleRootView: View {
     private let chatHeight: CGFloat = 480
 
     private var isExpanded: Bool { manager.expandedSessionId != nil }
+    private var headVisualPadding: CGFloat { DesignTokens.headVisualPadding }
 
     /// Sessions visible as heads (excludes the one morphed into the window).
     private var visibleSessions: [ChatSession] {
@@ -28,6 +29,21 @@ struct BobbleRootView: View {
             return CGFloat(count) * DesignTokens.headDiameter
                 + CGFloat(count - 1) * DesignTokens.headSpacing
         }
+    }
+
+    private var headsRenderHeight: CGFloat {
+        headsFrameHeight + (headVisualPadding * 2)
+    }
+
+    private var headsRenderWidth: CGFloat {
+        DesignTokens.headDiameter + (headVisualPadding * 2)
+    }
+
+    private func headYOffset(for index: Int) -> CGFloat {
+        let base = isExpanded
+            ? CGFloat(index) * DesignTokens.deckOffset
+            : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
+        return base + headVisualPadding
     }
 
     var body: some View {
@@ -87,18 +103,12 @@ struct BobbleRootView: View {
                                     onTap: { onHeadTapped(session) },
                                     morphNamespace: morphNamespace
                                 )
-                                .offset(
-                                    y: isExpanded
-                                        ? CGFloat(index) * DesignTokens.deckOffset
-                                        : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
-                                )
+                                .offset(y: headYOffset(for: index))
                                 .zIndex(Double(visibleSessions.count - index))
                             }
                         }
-                        // Keep the offset-based stack pinned to the top of its reserved height.
-                        // Center alignment causes large bottom overflow as the stack grows.
-                        .frame(height: headsFrameHeight, alignment: .top)
-                        .clipped()
+                        // Reserve extra render room so blur/shadows are not clipped at stack edges.
+                        .frame(width: headsRenderWidth, height: headsRenderHeight, alignment: .top)
                         .animation(DesignTokens.motionLayout, value: isExpanded)
                         .animation(DesignTokens.motionLayout, value: visibleSessions.count)
                     }

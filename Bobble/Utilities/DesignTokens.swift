@@ -8,6 +8,7 @@ enum DesignTokens {
     static let headDiameter: CGFloat = 50
     static let headSpacing: CGFloat = 8
     static let headInset: CGFloat = 14 // extra space around heads for hover scale, shadows, indicators
+    static let headVisualPadding: CGFloat = 8 // extra per-head render room for blur/shadow
     static let deckOffset: CGFloat = 14
     static let screenMargin: CGFloat = 16
     static let cornerRadius: CGFloat = 16

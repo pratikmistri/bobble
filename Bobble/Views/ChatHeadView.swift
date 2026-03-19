@@ -77,7 +77,7 @@ struct ChatHeadView: View {
         .onTapGesture {
             onTap()
         }
-        .onChange(of: statusIndicator) { newStatus in
+        .onChange(of: statusIndicator) { _, newStatus in
             updateStatusBlink(for: newStatus)
         }
         .contextMenu {

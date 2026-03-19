@@ -76,7 +76,8 @@ class ChatSessionViewModel: ObservableObject {
                 guard let self = self else { return }
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return }
-                self.session.messages.append(ChatMessage(role: .system, content: trimmed))
+                let kind = self.classifySystemEventKind(trimmed)
+                self.session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
                 self.notifyUpdate()
             }
         }
@@ -193,5 +194,41 @@ class ChatSessionViewModel: ObservableObject {
 
         guard !text.isEmpty else { return }
         session.messages.append(ChatMessage(role: .assistant, content: text))
+    }
+
+    private func classifySystemEventKind(_ text: String) -> ChatMessage.Kind {
+        let normalized = text.lowercased()
+
+        let permissionMarkers = [
+            "codex approval",
+            "codex permission",
+            "approval",
+            "permission",
+            "request user input",
+            "user input"
+        ]
+        if permissionMarkers.contains(where: normalized.contains) {
+            return .permission
+        }
+
+        let thoughtMarkers = [
+            "agent thought",
+            "codex reasoning",
+            "reasoning"
+        ]
+        if thoughtMarkers.contains(where: normalized.contains) {
+            return .agentThought
+        }
+
+        let isToolOrCommandEvent = normalized.hasPrefix("running command:")
+            || normalized.hasPrefix("command ")
+            || normalized.hasPrefix("running tool:")
+            || normalized.contains("tool call")
+            || normalized.contains("tool use")
+        if isToolOrCommandEvent {
+            return .toolUse
+        }
+
+        return .regular
     }
 }

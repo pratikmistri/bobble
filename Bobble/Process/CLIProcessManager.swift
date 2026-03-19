@@ -149,7 +149,7 @@ class CLIProcessManager {
                     "resume",
                     "--json",
                     "--skip-git-repo-check",
-                    "--full-auto",
+                    "--dangerously-bypass-approvals-and-sandbox",
                     sessionId,
                     prompt
                 ]
@@ -159,7 +159,7 @@ class CLIProcessManager {
                 "exec",
                 "--json",
                 "--skip-git-repo-check",
-                "--full-auto",
+                "--dangerously-bypass-approvals-and-sandbox",
                 "--cd",
                 workingDirectory,
                 prompt
