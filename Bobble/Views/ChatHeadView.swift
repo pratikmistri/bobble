@@ -4,6 +4,7 @@ struct ChatHeadView: View {
     let session: ChatSession
     let showProviderBadge: Bool
     let isExpanded: Bool
+    let dockSide: PanelDockSide
     let onTap: () -> Void
     var morphNamespace: Namespace.ID
 
@@ -26,7 +27,7 @@ struct ChatHeadView: View {
                     id: session.id,
                     in: morphNamespace,
                     properties: .frame,
-                    anchor: .bottomTrailing
+                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
                 )
                 .shadow(
                     color: .black.opacity(isHovering ? 0.26 : 0.16),
@@ -75,15 +76,19 @@ struct ChatHeadView: View {
         .animation(DesignTokens.motionHover, value: isHovering)
         .animation(DesignTokens.motionLayout, value: isExpanded)
         .animation(DesignTokens.motionEntrance, value: isShowingPreview)
-        .overlay(alignment: .leading) {
+        .overlay(alignment: dockSide == .trailing ? .leading : .trailing) {
             if let preview = previewContent, isShowingPreview {
                 ChatHeadPreviewBubble(
                     sessionName: session.name,
                     preview: preview
                 )
-                .offset(x: -(DesignTokens.headPreviewWidth + DesignTokens.headPreviewGap))
+                .offset(
+                    x: dockSide == .trailing
+                        ? -(DesignTokens.headPreviewWidth + DesignTokens.headPreviewGap)
+                        : (DesignTokens.headPreviewWidth + DesignTokens.headPreviewGap)
+                )
                 .transition(
-                    .scale(scale: 0.94, anchor: .trailing)
+                    .scale(scale: 0.94, anchor: dockSide == .trailing ? .trailing : .leading)
                         .combined(with: .opacity)
                 )
                 .allowsHitTesting(false)

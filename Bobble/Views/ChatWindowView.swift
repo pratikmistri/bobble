@@ -6,7 +6,7 @@ struct ChatContentView: View {
     let showProviderBadge: Bool
     let onClose: () -> Void
     let onMarkRead: () -> Void
-    let onRemove: () -> Void
+    let onArchive: () -> Void
 
     private let typingIndicatorID = "typing-indicator"
 
@@ -55,8 +55,8 @@ struct ChatContentView: View {
 
                 Spacer()
 
-                Button(action: onRemove) {
-                    Image(systemName: "trash")
+                Button(action: onArchive) {
+                    Image(systemName: "archivebox")
                         .font(.system(size: 12))
                         .foregroundColor(DesignTokens.textSecondary)
                 }

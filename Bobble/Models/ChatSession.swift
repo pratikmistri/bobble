@@ -1,6 +1,6 @@
 import Foundation
 
-struct ChatSession: Identifiable {
+struct ChatSession: Identifiable, Codable {
     static let defaultChatHeadSymbol = "💬"
 
     let id: UUID
@@ -13,11 +13,50 @@ struct ChatSession: Identifiable {
     var cliSessionId: String
     var cliSessionBackend: CLIBackend?
     var workspaceDirectory: String
+    var createdAt: Date
+    var updatedAt: Date
+    var isArchived: Bool
 
-    enum SessionState {
+    enum SessionState: Codable {
         case idle
         case running
         case error(String)
+
+        private enum CodingKeys: String, CodingKey {
+            case kind
+            case message
+        }
+
+        private enum Kind: String, Codable {
+            case idle
+            case running
+            case error
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            switch try container.decode(Kind.self, forKey: .kind) {
+            case .idle:
+                self = .idle
+            case .running:
+                self = .running
+            case .error:
+                self = .error(try container.decode(String.self, forKey: .message))
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            switch self {
+            case .idle:
+                try container.encode(Kind.idle, forKey: .kind)
+            case .running:
+                try container.encode(Kind.running, forKey: .kind)
+            case .error(let message):
+                try container.encode(Kind.error, forKey: .kind)
+                try container.encode(message, forKey: .message)
+            }
+        }
     }
 
     var displayChatHeadSymbol: String {
@@ -28,31 +67,56 @@ struct ChatSession: Identifiable {
         messages.contains { $0.role == .assistant && $0.isNew }
     }
 
+    var qualifiesForHistory: Bool {
+        messages.contains { $0.role == .user }
+    }
+
     mutating func markAssistantMessagesRead() {
         for index in messages.indices where messages[index].role == .assistant && messages[index].isNew {
             messages[index].isNew = false
         }
+        touchUpdatedAt()
     }
 
     var attachmentsDirectory: String {
         let directoryURL = URL(fileURLWithPath: workspaceDirectory, isDirectory: true)
             .appendingPathComponent("attachments", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
         return directoryURL.path
     }
 
-    init(name: String = "New Chat", provider: CLIBackend = .codex) {
-        let newId = UUID()
-        self.id = newId
+    init(
+        id: UUID = UUID(),
+        name: String = "New Chat",
+        chatHeadSymbol: String = Self.defaultChatHeadSymbol,
+        provider: CLIBackend = .codex,
+        selectedModel: CodexModelOption = .default,
+        messages: [ChatMessage] = [],
+        state: SessionState = .idle,
+        cliSessionId: String = UUID().uuidString,
+        cliSessionBackend: CLIBackend? = nil,
+        workspaceDirectory: String? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        isArchived: Bool = false
+    ) {
+        self.id = id
         self.name = name
-        self.chatHeadSymbol = Self.defaultChatHeadSymbol
+        self.chatHeadSymbol = chatHeadSymbol
         self.provider = provider
-        self.selectedModel = .default
-        self.messages = []
-        self.state = .idle
-        self.cliSessionId = UUID().uuidString
-        self.cliSessionBackend = nil
-        self.workspaceDirectory = Self.createWorkspaceDirectory(for: newId)
+        self.selectedModel = selectedModel
+        self.messages = messages
+        self.state = state
+        self.cliSessionId = cliSessionId
+        self.cliSessionBackend = cliSessionBackend
+        self.workspaceDirectory = workspaceDirectory ?? Self.createWorkspaceDirectory(for: id)
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.isArchived = isArchived
     }
 
     private static func createWorkspaceDirectory(for sessionId: UUID) -> String {
@@ -66,13 +130,13 @@ struct ChatSession: Identifiable {
             .appendingPathComponent(sessionId.uuidString, isDirectory: true)
 
         do {
-            try fm.createDirectory(at: sessionDir, withIntermediateDirectories: true)
+            try fm.createDirectory(at: sessionDir, withIntermediateDirectories: true, attributes: nil)
             return sessionDir.path
         } catch {
             let fallback = fm.temporaryDirectory
                 .appendingPathComponent("BobbleChatWorkspaces", isDirectory: true)
                 .appendingPathComponent(sessionId.uuidString, isDirectory: true)
-            try? fm.createDirectory(at: fallback, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: fallback, withIntermediateDirectories: true, attributes: nil)
             return fallback.path
         }
     }
@@ -97,6 +161,22 @@ struct ChatSession: Identifiable {
         }
 
         chatHeadSymbol = symbol
+        touchUpdatedAt()
+    }
+
+    mutating func touchUpdatedAt() {
+        updatedAt = Date()
+    }
+
+    func normalizedForRestore() -> ChatSession {
+        var restored = self
+        if case .running = restored.state {
+            restored.state = .idle
+        }
+        for index in restored.messages.indices where restored.messages[index].isStreaming {
+            restored.messages[index].isStreaming = false
+        }
+        return restored
     }
 }
 

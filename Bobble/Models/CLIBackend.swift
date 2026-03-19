@@ -1,6 +1,6 @@
 import Foundation
 
-enum CLIBackend: String, CaseIterable, Identifiable {
+enum CLIBackend: String, CaseIterable, Identifiable, Codable {
     case codex
     case copilot
     case claude
@@ -119,7 +119,7 @@ enum CLIBackend: String, CaseIterable, Identifiable {
     }
 }
 
-enum CodexModelOption: String, CaseIterable, Identifiable {
+enum CodexModelOption: String, CaseIterable, Identifiable, Codable {
     case `default` = "default"
     case gpt5Codex = "gpt-5-codex"
     case gpt53Codex = "gpt-5.3-codex"

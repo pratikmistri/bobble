@@ -152,8 +152,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onClose: { [weak self] in
                 self?.collapseSession()
             },
-            onRemoveSession: { [weak self] session in
-                self?.removeSession(session)
+            onArchiveSession: { [weak self] session in
+                self?.archiveSession(session)
+            },
+            onOpenHistorySession: { [weak self] session in
+                self?.openHistorySession(session)
+            },
+            onDeleteHistorySession: { [weak self] session in
+                self?.manager.deleteHistorySession(session)
             },
             onAddSession: { [weak self] in
                 self?.manager.addSession()
@@ -174,7 +180,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainPanel.delegate = self
 
         panelAnchor = positionManager.defaultPanelAnchor()
-        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor)
+        manager.panelDockSide = .trailing
+        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor, dockSide: manager.panelDockSide)
         mainPanel.setFrameOrigin(origin)
         mainPanel.orderFrontRegardless()
 
@@ -223,8 +230,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Pre-size the panel so the head->window morph has enough room immediately.
         let size = positionManager.expandedPanelSize(headsCount: manager.sessions.count)
-        panelAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size)
-        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor)
+        manager.panelDockSide = preferredDockSideForCurrentFrame()
+        panelAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: manager.panelDockSide)
+        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor, dockSide: manager.panelDockSide)
 
         // Resize panel synchronously
         mainPanel.setFrame(NSRect(origin: origin, size: size), display: true)
@@ -266,10 +274,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updatePanelSize()
     }
 
-    private func removeSession(_ session: ChatSession) {
+    private func archiveSession(_ session: ChatSession) {
         guard manager.expandedSessionId == session.id else {
             withAnimation(DesignTokens.motionFade) {
-                manager.removeSession(session)
+                manager.archiveSession(session)
             }
             return
         }
@@ -289,14 +297,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
 
             self.suppressNextPanelSizeUpdate = true
-            self.manager.removeSession(session)
+            self.manager.archiveSession(session)
 
             let finalSize = self.positionManager.collapsedPanelSize(count: self.manager.sessions.count)
-            self.panelAnchor = self.positionManager.constrainedPanelAnchor(self.panelAnchor, for: finalSize)
-            let finalOrigin = self.positionManager.panelOrigin(for: finalSize, anchor: self.panelAnchor)
+            self.panelAnchor = self.positionManager.constrainedPanelAnchor(
+                self.panelAnchor,
+                for: finalSize,
+                dockSide: self.manager.panelDockSide
+            )
+            let finalOrigin = self.positionManager.panelOrigin(
+                for: finalSize,
+                anchor: self.panelAnchor,
+                dockSide: self.manager.panelDockSide
+            )
             self.mainPanel.setFrame(NSRect(origin: finalOrigin, size: finalSize), display: true)
             self.isCollapsingSession = false
         }
+    }
+
+    private func openHistorySession(_ session: ChatSession) {
+        stopPhysics()
+        if let activeSession = manager.sessions.first(where: { $0.id == session.id }) {
+            if manager.expandedSessionId == activeSession.id {
+                return
+            }
+
+            if manager.expandedSessionId != nil {
+                withAnimation(DesignTokens.motionLayout) {
+                    manager.expandedSessionId = activeSession.id
+                }
+            } else {
+                expandSession(activeSession)
+            }
+            return
+        }
+
+        _ = manager.restoreSessionFromHistory(session)
     }
 
     private func updatePanelSize() {
@@ -316,14 +352,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mode: PanelAnimationMode = .fullFrame,
         completion: (() -> Void)? = nil
     ) {
-        let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size)
-        let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor)
+        let targetDockSide = preferredDockSideForCurrentFrame()
+        let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: targetDockSide)
+        let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor, dockSide: targetDockSide)
         let finalFrame = NSRect(origin: finalOrigin, size: size)
         let animatedFrame: NSRect
 
         switch mode {
         case .fullFrame:
             panelAnchor = resolvedAnchor
+            manager.panelDockSide = targetDockSide
             animatedFrame = finalFrame
         case .verticalCollapse:
             let currentFrame = mainPanel.frame
@@ -345,6 +383,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } completionHandler: {
             if mode != .fullFrame {
                 self.panelAnchor = resolvedAnchor
+                self.manager.panelDockSide = targetDockSide
                 self.mainPanel.setFrame(finalFrame, display: true)
             }
             completion?()
@@ -370,10 +409,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             y: mainPanel.frame.origin.y + (mouseLocation.y - lastDragMouseLocation.y)
         )
         let size = mainPanel.frame.size
-        let resolvedOrigin = positionManager.constrainedPanelOrigin(proposedOrigin, for: size)
+        let resolvedOrigin = positionManager.constrainedPanelOrigin(
+            proposedOrigin,
+            for: size,
+            dockSide: manager.panelDockSide
+        )
 
         mainPanel.setFrameOrigin(resolvedOrigin)
-        panelAnchor = positionManager.panelAnchor(for: resolvedOrigin, size: size)
+        panelAnchor = positionManager.panelAnchor(for: resolvedOrigin, size: size, dockSide: manager.panelDockSide)
         self.lastDragMouseLocation = mouseLocation
 
         if let lastDragSample {
@@ -394,7 +437,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishMovingPanel() {
         lastDragMouseLocation = nil
         lastDragSample = nil
+        panelAnchor = positionManager.panelAnchor(
+            for: mainPanel.frame.origin,
+            size: mainPanel.frame.size,
+            dockSide: manager.panelDockSide
+        )
         startPhysicsIfNeeded()
+    }
+
+    private func preferredDockSideForCurrentFrame() -> PanelDockSide {
+        positionManager.preferredDockSide(
+            for: mainPanel.frame.origin,
+            size: mainPanel.frame.size,
+            currentSide: manager.panelDockSide
+        )
     }
 
     private func startPhysicsIfNeeded() {
@@ -430,7 +486,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         origin.x += velocity.dx * dt
         origin.y += velocity.dy * dt
 
-        let constrainedOrigin = positionManager.constrainedPanelOrigin(origin, for: size)
+        let constrainedOrigin = positionManager.constrainedPanelOrigin(origin, for: size, dockSide: manager.panelDockSide)
 
         if constrainedOrigin.x != origin.x {
             origin.x = constrainedOrigin.x
@@ -447,7 +503,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         velocity.dy *= drag
 
         mainPanel.setFrameOrigin(origin)
-        panelAnchor = positionManager.panelAnchor(for: origin, size: size)
+        panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: manager.panelDockSide)
         tossVelocity = velocity
 
         if hypot(velocity.dx, velocity.dy) < 18 {
@@ -475,6 +531,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func cleanup() {
+        manager.flushPersistence()
         manager.terminateAll()
     }
 

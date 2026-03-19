@@ -1,5 +1,10 @@
 import AppKit
 
+enum PanelDockSide: Equatable {
+    case leading
+    case trailing
+}
+
 struct WindowPositionManager {
     private let headDiameter: CGFloat = DesignTokens.headDiameter
     private let headSpacing: CGFloat = DesignTokens.headSpacing
@@ -9,20 +14,22 @@ struct WindowPositionManager {
     private let chatHeight: CGFloat = 480
     private let vStackSpacing: CGFloat = 8
     private let leadingOverflow: CGFloat = DesignTokens.headPreviewOverflow
+    private let headDockInset: CGFloat = DesignTokens.headInset + DesignTokens.headVisualPadding
 
     // MARK: - Collapsed state (just heads)
 
     func collapsedPanelSize(count: Int) -> NSSize {
-        let totalHeads = count + 1 // +1 for add button
+        let controlRows = 2 // add + history
+        let totalRows = count + controlRows
         let inset = DesignTokens.headInset * 2
         let stackVisualOverflow = count > 0 ? headVisualPadding * 2 : 0
-        let height = CGFloat(totalHeads) * headDiameter
-            + CGFloat(totalHeads - 1) * headSpacing
+        let height = CGFloat(totalRows) * headDiameter
+            + CGFloat(max(totalRows - 1, 0)) * headSpacing
             + stackVisualOverflow
             + inset
-        let headsWidth = headDiameter + stackVisualOverflow
+        let visibleWidth = headDiameter + stackVisualOverflow
         return NSSize(
-            width: headsWidth + inset + DesignTokens.headPreviewOverflow,
+            width: visibleWidth + inset + DesignTokens.headPreviewOverflow,
             height: height
         )
     }
@@ -33,13 +40,14 @@ struct WindowPositionManager {
         let nonExpanded = headsCount - 1
         let inset = DesignTokens.headInset * 2
 
-        // Heads section: add button + deck of non-expanded heads
         let addH = headDiameter
+        let historyH = headDiameter
         let deckH = nonExpanded > 0
             ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset + (headVisualPadding * 2)
             : 0
         let headsGap = nonExpanded > 0 ? headSpacing : 0
-        let headsSection = inset + addH + headsGap + deckH
+        let controlsGap = headSpacing
+        let headsSection = inset + addH + controlsGap + historyH + headsGap + deckH
 
         let totalH = headsSection + vStackSpacing + chatHeight
         return NSSize(
@@ -55,23 +63,28 @@ struct WindowPositionManager {
         guard let screen = screen(containing: mouseLocation) ?? NSScreen.main else { return .zero }
         let frame = constrainedScreenFrame(for: screen)
         return NSPoint(
-            x: frame.maxX,
+            x: frame.maxX - headDockInset,
             y: frame.minY
         )
     }
 
-    func constrainedPanelAnchor(_ anchor: NSPoint, for size: NSSize) -> NSPoint {
-        let origin = NSPoint(x: anchor.x - size.width, y: anchor.y)
-        let constrainedOrigin = constrainedPanelOrigin(origin, for: size)
-        return panelAnchor(for: constrainedOrigin, size: size)
+    func constrainedPanelAnchor(_ anchor: NSPoint, for size: NSSize, dockSide: PanelDockSide) -> NSPoint {
+        let origin = panelOrigin(for: size, anchor: anchor, dockSide: dockSide)
+        let constrainedOrigin = constrainedPanelOrigin(origin, for: size, dockSide: dockSide)
+        return panelAnchor(for: constrainedOrigin, size: size, dockSide: dockSide)
     }
 
-    func panelAnchor(for origin: NSPoint, size: NSSize) -> NSPoint {
-        NSPoint(x: origin.x + size.width, y: origin.y)
+    func panelAnchor(for origin: NSPoint, size: NSSize, dockSide: PanelDockSide) -> NSPoint {
+        switch dockSide {
+        case .leading:
+            return NSPoint(x: origin.x + headDockInset, y: origin.y)
+        case .trailing:
+            return NSPoint(x: origin.x + size.width - headDockInset, y: origin.y)
+        }
     }
 
-    func constrainedPanelOrigin(_ origin: NSPoint, for size: NSSize) -> NSPoint {
-        let visibleFrame = visibleContentFrame(for: origin, size: size)
+    func constrainedPanelOrigin(_ origin: NSPoint, for size: NSSize, dockSide: PanelDockSide) -> NSPoint {
+        let visibleFrame = visibleContentFrame(for: origin, size: size, dockSide: dockSide)
         let referencePoint = NSPoint(x: visibleFrame.midX, y: visibleFrame.midY)
 
         guard let screen = screen(containing: referencePoint) ?? nearestScreen(to: referencePoint) else {
@@ -79,8 +92,18 @@ struct WindowPositionManager {
         }
 
         let screenFrame = constrainedScreenFrame(for: screen)
-        let minOriginX = screenFrame.minX - leadingOverflow
-        let maxOriginX = screenFrame.maxX - size.width
+        let minOriginX: CGFloat
+        let maxOriginX: CGFloat
+
+        switch dockSide {
+        case .leading:
+            minOriginX = screenFrame.minX
+            maxOriginX = screenFrame.maxX - (size.width - leadingOverflow)
+        case .trailing:
+            minOriginX = screenFrame.minX - leadingOverflow
+            maxOriginX = screenFrame.maxX - size.width
+        }
+
         let minOriginY = screenFrame.minY
         let maxOriginY = screenFrame.maxY - size.height
 
@@ -90,9 +113,28 @@ struct WindowPositionManager {
         )
     }
 
-    func panelOrigin(for size: NSSize, anchor: NSPoint) -> NSPoint {
-        let proposedOrigin = NSPoint(x: anchor.x - size.width, y: anchor.y)
-        return constrainedPanelOrigin(proposedOrigin, for: size)
+    func panelOrigin(for size: NSSize, anchor: NSPoint, dockSide: PanelDockSide) -> NSPoint {
+        let proposedOrigin: NSPoint
+
+        switch dockSide {
+        case .leading:
+            proposedOrigin = NSPoint(x: anchor.x - headDockInset, y: anchor.y)
+        case .trailing:
+            proposedOrigin = NSPoint(x: anchor.x + headDockInset - size.width, y: anchor.y)
+        }
+
+        return constrainedPanelOrigin(proposedOrigin, for: size, dockSide: dockSide)
+    }
+
+    func preferredDockSide(for origin: NSPoint, size: NSSize, currentSide: PanelDockSide) -> PanelDockSide {
+        let visibleFrame = visibleContentFrame(for: origin, size: size, dockSide: currentSide)
+        let referencePoint = NSPoint(x: visibleFrame.midX, y: visibleFrame.midY)
+
+        guard let screen = screen(containing: referencePoint) ?? nearestScreen(to: referencePoint) else {
+            return currentSide
+        }
+
+        return visibleFrame.midX <= constrainedScreenFrame(for: screen).midX ? .leading : .trailing
     }
 
     private func screen(containing point: NSPoint) -> NSScreen? {
@@ -105,13 +147,25 @@ struct WindowPositionManager {
         screen.frame.insetBy(dx: screenMargin, dy: screenMargin)
     }
 
-    private func visibleContentFrame(for origin: NSPoint, size: NSSize) -> NSRect {
-        NSRect(
-            x: origin.x + leadingOverflow,
-            y: origin.y,
-            width: max(size.width - leadingOverflow, 0),
-            height: size.height
-        )
+    private func visibleContentFrame(for origin: NSPoint, size: NSSize, dockSide: PanelDockSide) -> NSRect {
+        let contentWidth = max(size.width - leadingOverflow, 0)
+
+        switch dockSide {
+        case .leading:
+            return NSRect(
+                x: origin.x,
+                y: origin.y,
+                width: contentWidth,
+                height: size.height
+            )
+        case .trailing:
+            return NSRect(
+                x: origin.x + leadingOverflow,
+                y: origin.y,
+                width: contentWidth,
+                height: size.height
+            )
+        }
     }
 
     private func nearestScreen(to point: NSPoint) -> NSScreen? {

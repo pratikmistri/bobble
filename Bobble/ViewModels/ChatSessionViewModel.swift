@@ -283,6 +283,7 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func notifyUpdate() {
+        session.touchUpdatedAt()
         objectWillChange.send()
         onSessionUpdated?(session)
     }

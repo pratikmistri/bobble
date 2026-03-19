@@ -14,6 +14,7 @@ struct ChatHeadStackView: View {
                     session: session,
                     showProviderBadge: manager.hasMixedProviders,
                     isExpanded: manager.expandedSessionId == session.id,
+                    dockSide: manager.panelDockSide,
                     onTap: { onHeadTapped(session) },
                     morphNamespace: morphNamespace
                 )

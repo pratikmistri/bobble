@@ -1,6 +1,6 @@
 import Foundation
 
-struct ChatMessage: Identifiable {
+struct ChatMessage: Identifiable, Codable {
     let id: UUID
     let role: Role
     var content: String
@@ -10,14 +10,14 @@ struct ChatMessage: Identifiable {
     var isNew: Bool
     var kind: Kind
 
-    enum Role {
+    enum Role: String, Codable {
         case user
         case assistant
         case system
         case error
     }
 
-    enum Kind {
+    enum Kind: String, Codable {
         case regular
         case permission
         case agentThought
@@ -25,37 +25,40 @@ struct ChatMessage: Identifiable {
     }
 
     init(
+        id: UUID = UUID(),
         role: Role,
         content: String,
         attachments: [ChatAttachment] = [],
+        timestamp: Date = Date(),
         isStreaming: Bool = false,
+        isNew: Bool? = nil,
         kind: Kind = .regular
     ) {
-        self.id = UUID()
+        self.id = id
         self.role = role
         self.content = content
         self.attachments = attachments
-        self.timestamp = Date()
+        self.timestamp = timestamp
         self.isStreaming = isStreaming
-        self.isNew = role == .assistant
+        self.isNew = isNew ?? (role == .assistant)
         self.kind = kind
     }
 }
 
-struct ChatAttachment: Identifiable, Hashable {
+struct ChatAttachment: Identifiable, Hashable, Codable {
     let id: UUID
     let kind: Kind
     let fileName: String
     let filePath: String
     let relativePath: String
 
-    enum Kind: String {
+    enum Kind: String, Codable {
         case file
         case image
     }
 
-    init(kind: Kind, fileName: String, filePath: String, relativePath: String) {
-        self.id = UUID()
+    init(id: UUID = UUID(), kind: Kind, fileName: String, filePath: String, relativePath: String) {
+        self.id = id
         self.kind = kind
         self.fileName = fileName
         self.filePath = filePath
