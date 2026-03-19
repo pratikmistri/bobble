@@ -5,6 +5,8 @@ struct BobbleRootView: View {
     let onHeadTapped: (ChatSession) -> Void
     let onClose: () -> Void
     let onAddSession: () -> Void
+    let onHeadsDragChanged: () -> Void
+    let onHeadsDragEnded: () -> Void
 
     @Namespace private var morphNamespace
     @State private var isHoveringAdd = false
@@ -44,6 +46,16 @@ struct BobbleRootView: View {
             ? CGFloat(index) * DesignTokens.deckOffset
             : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
         return base + headVisualPadding
+    }
+
+    private var headsDragGesture: some Gesture {
+        DragGesture(minimumDistance: 3)
+            .onChanged { _ in
+                onHeadsDragChanged()
+            }
+            .onEnded { _ in
+                onHeadsDragEnded()
+            }
     }
 
     var body: some View {
@@ -119,6 +131,8 @@ struct BobbleRootView: View {
                     }
                 }
                 .padding(DesignTokens.headInset)
+                .contentShape(Rectangle())
+                .simultaneousGesture(headsDragGesture)
             }
         }
         // Keep heads anchored to the panel corner during expand/collapse so motion stays continuous.
