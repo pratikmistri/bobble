@@ -7,25 +7,25 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000001 /* BobbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000001; };
-		A10000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000002; };
-		A10000003 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000003; };
-		A10000004 /* WindowPositionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000004; };
-		A10000005 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000005; };
-		A10000006 /* ChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000006; };
-		A10000007 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000007; };
-		A10000008 /* CLIBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000008; };
-		A10000009 /* ChatHeadsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000009; };
-		A10000010 /* ChatSessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010; };
-		A10000011 /* CLIProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000011; };
-		A10000012 /* StreamParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012; };
-		A10000013 /* ChatHeadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000013; };
-		A10000014 /* ChatHeadStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000014; };
-		A10000015 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000015; };
-		A10000016 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000016; };
-		A10000017 /* InputBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000017; };
-		A10000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000018; };
-		A10000019 /* BobbleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021; };
+		A10000001 /* BobbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000001 /* BobbleApp.swift */; };
+		A10000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000002 /* AppDelegate.swift */; };
+		A10000003 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000003 /* FloatingPanel.swift */; };
+		A10000004 /* WindowPositionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000004 /* WindowPositionManager.swift */; };
+		A10000005 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000005 /* DesignTokens.swift */; };
+		A10000006 /* ChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000006 /* ChatSession.swift */; };
+		A10000007 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000007 /* ChatMessage.swift */; };
+		A10000008 /* CLIBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000008 /* CLIBackend.swift */; };
+		A10000009 /* ChatHeadsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000009 /* ChatHeadsManager.swift */; };
+		A10000010 /* ChatSessionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010 /* ChatSessionViewModel.swift */; };
+		A10000011 /* CLIProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000011 /* CLIProcessManager.swift */; };
+		A10000012 /* StreamParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012 /* StreamParser.swift */; };
+		A10000013 /* ChatHeadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000013 /* ChatHeadView.swift */; };
+		A10000014 /* ChatHeadStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000014 /* ChatHeadStackView.swift */; };
+		A10000015 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000015 /* ChatWindowView.swift */; };
+		A10000016 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000016 /* MessageBubbleView.swift */; };
+		A10000017 /* InputBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000017 /* InputBarView.swift */; };
+		A10000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000018 /* Assets.xcassets */; };
+		A10000019 /* BobbleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021 /* BobbleRootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -303,9 +303,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Bobble/Bobble.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MJWG2F9J23;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Bobble/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -327,9 +329,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Bobble/Bobble.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MJWG2F9J23;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Bobble/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -368,7 +372,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = F10000001 /* Project object */;
 }

@@ -44,8 +44,13 @@ class ChatHeadsManager: ObservableObject {
         let vm = ChatSessionViewModel(session: session, backend: detectedBackend)
         vm.onSessionUpdated = { [weak self] updated in
             guard let self = self else { return }
+            var syncedSession = updated
+            if self.expandedSessionId == updated.id {
+                syncedSession.markAssistantMessagesRead()
+                self.viewModels[updated.id]?.markAssistantMessagesRead(notify: false)
+            }
             if let idx = self.sessions.firstIndex(where: { $0.id == updated.id }) {
-                self.sessions[idx] = updated
+                self.sessions[idx] = syncedSession
             }
         }
         viewModels[session.id] = vm
@@ -66,9 +71,10 @@ class ChatHeadsManager: ObservableObject {
 
     func markRead(sessionId: UUID) {
         guard let idx = sessions.firstIndex(where: { $0.id == sessionId }) else { return }
-        for i in sessions[idx].messages.indices {
-            sessions[idx].messages[i].isNew = false
-        }
+        var updatedSession = sessions[idx]
+        updatedSession.markAssistantMessagesRead()
+        sessions[idx] = updatedSession
+        viewModels[sessionId]?.markAssistantMessagesRead(notify: false)
     }
 
     func terminateAll() {

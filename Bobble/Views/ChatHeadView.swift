@@ -92,10 +92,7 @@ struct ChatHeadView: View {
         case .error:
             return .needsHelp
         case .idle:
-            let hasCompletedReply = session.messages.contains {
-                $0.role == .assistant && !$0.isStreaming && !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            }
-            return hasCompletedReply ? .completed : nil
+            return session.hasUnread ? .completed : nil
         }
     }
 

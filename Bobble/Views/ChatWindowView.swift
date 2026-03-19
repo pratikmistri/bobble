@@ -7,6 +7,8 @@ struct ChatContentView: View {
     let onMarkRead: () -> Void
     let onRemove: () -> Void
 
+    private let typingIndicatorID = "typing-indicator"
+
     @State private var headerAppeared = false
     @State private var contentAppeared = false
 
@@ -17,6 +19,15 @@ struct ChatContentView: View {
             }
             return lhs.id.uuidString < rhs.id.uuidString
         }
+    }
+
+    private var activeStreamingAssistantMessage: ChatMessage? {
+        chronologicalMessages.last(where: { $0.role == .assistant && $0.isStreaming })
+    }
+
+    private var shouldShowTypingIndicatorPlaceholder: Bool {
+        guard case .running = viewModel.session.state else { return false }
+        return activeStreamingAssistantMessage == nil
     }
 
     var body: some View {
@@ -68,6 +79,11 @@ struct ChatContentView: View {
                             MessageBubbleView(message: message, index: index)
                                 .id(message.id)
                         }
+
+                        if shouldShowTypingIndicatorPlaceholder {
+                            TypingIndicatorBubbleView()
+                                .id(typingIndicatorID)
+                        }
                     }
                     .padding(12)
                 }
@@ -76,6 +92,12 @@ struct ChatContentView: View {
                         withAnimation(DesignTokens.motionScroll) {
                             proxy.scrollTo(lastId, anchor: .bottom)
                         }
+                    }
+                }
+                .onChange(of: shouldShowTypingIndicatorPlaceholder) {
+                    guard shouldShowTypingIndicatorPlaceholder else { return }
+                    withAnimation(DesignTokens.motionScroll) {
+                        proxy.scrollTo(typingIndicatorID, anchor: .bottom)
                     }
                 }
             }

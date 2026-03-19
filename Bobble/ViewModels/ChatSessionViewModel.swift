@@ -1,6 +1,7 @@
-import AppKit
-import Foundation
 import Combine
+import AppKit
+import CoreGraphics
+import Foundation
 import UniformTypeIdentifiers
 
 class ChatSessionViewModel: ObservableObject {
@@ -14,6 +15,8 @@ class ChatSessionViewModel: ObservableObject {
     private let backend: CLIBackend?
     private var processManager: CLIProcessManager?
     private var cancellables = Set<AnyCancellable>()
+    private var didRequestScreenCaptureAccessThisLaunch = false
+    private var didShowScreenCaptureAccessErrorThisLaunch = false
 
     init(session: ChatSession, backend: CLIBackend?) {
         self.session = session
@@ -183,8 +186,17 @@ class ChatSessionViewModel: ObservableObject {
         pendingAttachments.removeAll { $0.id == id }
     }
 
+    func markAssistantMessagesRead(notify: Bool = true) {
+        let hadUnread = session.hasUnread
+        session.markAssistantMessagesRead()
+
+        guard notify, hadUnread else { return }
+        notifyUpdate()
+    }
+
     func captureScreenshot() {
         guard !isCapturingScreenshot else { return }
+        guard ensureScreenCaptureAccess() else { return }
         isCapturingScreenshot = true
 
         let fileName = makeUniqueFileName(baseName: "screenshot-\(timestampSlug())", pathExtension: "png")
@@ -223,6 +235,30 @@ class ChatSessionViewModel: ObservableObject {
             isCapturingScreenshot = false
             appendAttachmentError("Couldn't start screenshot capture: \(error.localizedDescription)")
         }
+    }
+
+    private func ensureScreenCaptureAccess() -> Bool {
+        if CGPreflightScreenCaptureAccess() {
+            didShowScreenCaptureAccessErrorThisLaunch = false
+            return true
+        }
+
+        if !didRequestScreenCaptureAccessThisLaunch {
+            didRequestScreenCaptureAccessThisLaunch = true
+            _ = CGRequestScreenCaptureAccess()
+        }
+
+        guard CGPreflightScreenCaptureAccess() else {
+            if !didShowScreenCaptureAccessErrorThisLaunch {
+                didShowScreenCaptureAccessErrorThisLaunch = true
+                appendAttachmentError(
+                    "Screen Recording access is required for screenshots. If you just enabled Bobble in System Settings > Privacy & Security > Screen Recording, quit and reopen Bobble before trying again."
+                )
+            }
+            return false
+        }
+
+        return true
     }
 
     private func notifyUpdate() {

@@ -20,8 +20,13 @@ struct ChatSession: Identifiable {
     }
 
     var hasUnread: Bool {
-        guard let last = messages.last else { return false }
-        return last.role == .assistant && last.isNew
+        messages.contains { $0.role == .assistant && $0.isNew }
+    }
+
+    mutating func markAssistantMessagesRead() {
+        for index in messages.indices where messages[index].role == .assistant && messages[index].isNew {
+            messages[index].isNew = false
+        }
     }
 
     var attachmentsDirectory: String {
