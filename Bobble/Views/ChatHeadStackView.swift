@@ -12,6 +12,7 @@ struct ChatHeadStackView: View {
             ForEach(manager.sessions) { session in
                 ChatHeadView(
                     session: session,
+                    showProviderBadge: manager.hasMixedProviders,
                     isExpanded: manager.expandedSessionId == session.id,
                     onTap: { onHeadTapped(session) },
                     morphNamespace: morphNamespace

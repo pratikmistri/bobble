@@ -1,18 +1,75 @@
 import Foundation
 
-enum CLIBackend: String, CaseIterable {
+enum CLIBackend: String, CaseIterable, Identifiable {
     case codex
+    case copilot
     case claude
+
+    var id: String { rawValue }
 
     var command: String {
         switch self {
-        case .claude: return "claude"
-        case .codex: return "codex"
+        case .codex:
+            return "codex"
+        case .copilot:
+            return "copilot"
+        case .claude:
+            return "claude"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .codex:
+            return "Codex"
+        case .copilot:
+            return "GitHub Copilot"
+        case .claude:
+            return "Claude Code"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .codex:
+            return "Codex"
+        case .copilot:
+            return "Copilot"
+        case .claude:
+            return "Claude"
+        }
+    }
+
+    var missingCLIMessage: String {
+        switch self {
+        case .codex:
+            return "Codex CLI not found. Install with `npm install -g @openai/codex`."
+        case .copilot:
+            return "GitHub Copilot CLI not found. Install and authenticate the `copilot` CLI."
+        case .claude:
+            return "Claude Code CLI not found. Install Claude Code so the `claude` command is available."
         }
     }
 
     static func detect() -> CLIBackend? {
-        return CLIBackend.codex.resolvedPath() == nil ? nil : .codex
+        preferredDefault(from: Set(availableBackends()))
+    }
+
+    static func availableBackends() -> [CLIBackend] {
+        allCases.filter { $0.resolvedPath() != nil }
+    }
+
+    static func preferredDefault(from availableBackends: Set<CLIBackend>) -> CLIBackend? {
+        if availableBackends.contains(.codex) {
+            return .codex
+        }
+        if availableBackends.contains(.copilot) {
+            return .copilot
+        }
+        if availableBackends.contains(.claude) {
+            return .claude
+        }
+        return allCases.first
     }
 
     /// Common directories where npm/brew/cargo installs end up,

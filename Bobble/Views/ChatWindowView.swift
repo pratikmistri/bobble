@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatContentView: View {
     let session: ChatSession
     @ObservedObject var viewModel: ChatSessionViewModel
+    let showProviderBadge: Bool
     let onClose: () -> Void
     let onMarkRead: () -> Void
     let onRemove: () -> Void
@@ -47,6 +48,10 @@ struct ChatContentView: View {
                     .font(DesignTokens.headerFont)
                     .foregroundColor(DesignTokens.textPrimary)
                     .lineLimit(1)
+
+                if showProviderBadge {
+                    ProviderBadgeView(provider: viewModel.session.provider)
+                }
 
                 Spacer()
 
@@ -107,7 +112,7 @@ struct ChatContentView: View {
             Divider()
 
             // Input bar
-            InputBarView(viewModel: viewModel)
+            InputBarView(viewModel: viewModel, showProviderBadge: showProviderBadge)
                 .offset(y: contentAppeared ? 0 : 8)
                 .opacity(contentAppeared ? 1 : 0)
         }

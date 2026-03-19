@@ -88,6 +88,7 @@ struct BobbleRootView: View {
                         ChatContentView(
                             session: session,
                             viewModel: viewModel,
+                            showProviderBadge: manager.hasMixedProviders,
                             onClose: onClose,
                             onMarkRead: { manager.markRead(sessionId: sessionId) },
                             onRemove: {
@@ -116,6 +117,7 @@ struct BobbleRootView: View {
                             ForEach(Array(visibleSessions.enumerated()), id: \.element.id) { index, session in
                                 ChatHeadView(
                                     session: session,
+                                    showProviderBadge: manager.hasMixedProviders,
                                     isExpanded: false,
                                     onTap: { onHeadTapped(session) },
                                     morphNamespace: morphNamespace

@@ -4,6 +4,7 @@ class StreamParser {
     private var buffer = Data()
     private let backend: CLIBackend
     private var codexAccumulatedText = ""
+    private var copilotAccumulatedText = ""
 
     var onTextDelta: ((String) -> Void)?
     var onResult: ((String) -> Void)?
@@ -17,6 +18,11 @@ class StreamParser {
     }
 
     func feed(_ data: Data) {
+        if backend == .copilot {
+            processCopilotData(data)
+            return
+        }
+
         buffer.append(data)
 
         // Split on newlines and process complete lines
@@ -30,13 +36,48 @@ class StreamParser {
         }
     }
 
+    func finish() {
+        switch backend {
+        case .copilot:
+            if !buffer.isEmpty {
+                processCopilotData(Data())
+            }
+            let finalText = copilotAccumulatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !finalText.isEmpty {
+                onResult?(finalText)
+            }
+            copilotAccumulatedText = ""
+
+        case .claude, .codex:
+            guard !buffer.isEmpty else { return }
+            let trailingData = buffer
+            buffer.removeAll()
+            processLine(trailingData)
+        }
+    }
+
     private func processLine(_ data: Data) {
         switch backend {
         case .claude:
             processClaudeLine(data)
+        case .copilot:
+            break
         case .codex:
             processCodexLine(data)
         }
+    }
+
+    private func processCopilotData(_ data: Data) {
+        buffer.append(data)
+
+        guard let text = String(data: buffer, encoding: .utf8), !text.isEmpty else {
+            return
+        }
+
+        buffer.removeAll()
+        copilotAccumulatedText += text
+        onAssistantMessageStarted?()
+        onTextDelta?(text)
     }
 
     private func processClaudeLine(_ data: Data) {

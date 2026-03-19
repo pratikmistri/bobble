@@ -4,26 +4,41 @@ import Combine
 
 class ChatHeadsManager: ObservableObject {
     @Published var sessions: [ChatSession] = []
-    @Published var expandedSessionId: UUID?
-    @Published var detectedBackend: CLIBackend?
+    @Published var expandedSessionId: UUID? {
+        didSet {
+            syncSelectedProviderFromExpandedSession()
+        }
+    }
+    @Published var selectedProvider: CLIBackend = .codex {
+        didSet {
+            onSelectedProviderChanged?(selectedProvider)
+        }
+    }
+    @Published var availableBackends: Set<CLIBackend> = []
     @Published var morphOriginY: CGFloat = 240
     @Published var isRevealed = false
 
     var onSessionsChanged: ((Int) -> Void)?
     var onSessionAdded: ((ChatSession) -> Void)?
+    var onSelectedProviderChanged: ((CLIBackend) -> Void)?
 
     private var viewModels: [UUID: ChatSessionViewModel] = [:]
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        detectBackend()
+        detectAvailableBackends()
     }
 
-    private func detectBackend() {
+    private func detectAvailableBackends() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let backend = CLIBackend.detect()
+            let available = Set(CLIBackend.availableBackends())
+            let preferred = CLIBackend.preferredDefault(from: available) ?? .codex
             DispatchQueue.main.async {
-                self?.detectedBackend = backend
+                guard let self else { return }
+                self.availableBackends = available
+                if self.sessions.isEmpty {
+                    self.selectedProvider = preferred
+                }
             }
         }
     }
@@ -33,15 +48,19 @@ class ChatHeadsManager: ObservableObject {
         return sessions.first { $0.id == id }
     }
 
+    var hasMixedProviders: Bool {
+        Set(sessions.map(\.provider)).count > 1
+    }
+
     func viewModel(for sessionId: UUID) -> ChatSessionViewModel? {
         return viewModels[sessionId]
     }
 
     func addSession() {
-        let session = ChatSession()
+        let session = ChatSession(provider: selectedProvider)
         sessions.append(session)
 
-        let vm = ChatSessionViewModel(session: session, backend: detectedBackend)
+        let vm = ChatSessionViewModel(session: session)
         vm.onSessionUpdated = { [weak self] updated in
             guard let self = self else { return }
             var syncedSession = updated
@@ -57,6 +76,29 @@ class ChatHeadsManager: ObservableObject {
 
         onSessionsChanged?(sessions.count)
         onSessionAdded?(session)
+    }
+
+    func updateSelectedProvider(_ provider: CLIBackend) {
+        if selectedProvider != provider {
+            selectedProvider = provider
+        }
+
+        guard let sessionId = activeSessionId else { return }
+        setProvider(provider, for: sessionId)
+    }
+
+    func setProvider(_ provider: CLIBackend, for sessionId: UUID) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionId }) else { return }
+        guard sessions[index].provider != provider else { return }
+
+        var updatedSession = sessions[index]
+        updatedSession.provider = provider
+        sessions[index] = updatedSession
+        viewModels[sessionId]?.updateProvider(provider)
+
+        if expandedSessionId == sessionId && selectedProvider != provider {
+            selectedProvider = provider
+        }
     }
 
     func removeSession(_ session: ChatSession) {
@@ -80,6 +122,17 @@ class ChatHeadsManager: ObservableObject {
     func terminateAll() {
         for vm in viewModels.values {
             vm.terminate()
+        }
+    }
+
+    private var activeSessionId: UUID? {
+        expandedSessionId ?? sessions.last?.id
+    }
+
+    private func syncSelectedProviderFromExpandedSession() {
+        guard let expandedSession else { return }
+        if selectedProvider != expandedSession.provider {
+            selectedProvider = expandedSession.provider
         }
     }
 }

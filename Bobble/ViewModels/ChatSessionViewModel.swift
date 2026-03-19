@@ -12,16 +12,14 @@ class ChatSessionViewModel: ObservableObject {
 
     var onSessionUpdated: ((ChatSession) -> Void)?
 
-    private let backend: CLIBackend?
     private var processManager: CLIProcessManager?
     private var chatHeadSymbolProcess: CLIProcessManager?
     private var cancellables = Set<AnyCancellable>()
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
 
-    init(session: ChatSession, backend: CLIBackend?) {
+    init(session: ChatSession) {
         self.session = session
-        self.backend = backend
     }
 
     func send() {
@@ -48,10 +46,11 @@ class ChatSessionViewModel: ObservableObject {
             updateChatHeadSymbolFromFirstMessage(prompt: prompt, attachments: attachments)
         }
 
-        guard let backend = backend, let path = backend.resolvedPath() else {
+        let backend = session.provider
+        guard let path = backend.resolvedPath() else {
             let errorMsg = ChatMessage(
                 role: .error,
-                content: "Codex CLI not found. Install with `npm install -g @openai/codex`."
+                content: backend.missingCLIMessage
             )
             session.messages.append(errorMsg)
             session.state = .error("CLI not found")
@@ -62,6 +61,13 @@ class ChatSessionViewModel: ObservableObject {
         session.state = .running
         notifyUpdate()
 
+        let shouldResume = session.cliSessionBackend == backend
+            && session.messages.filter({ $0.role == .user }).count > 1
+        if !shouldResume {
+            session.cliSessionId = UUID().uuidString
+        }
+        session.cliSessionBackend = backend
+
         let pm = CLIProcessManager(
             backend: backend,
             executablePath: path,
@@ -69,7 +75,7 @@ class ChatSessionViewModel: ObservableObject {
             prompt: buildPrompt(userPrompt: prompt, attachments: attachments),
             imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: session.cliSessionId,
-            isResume: session.messages.filter({ $0.role == .user }).count > 1,
+            isResume: shouldResume,
             workingDirectory: session.workspaceDirectory
         )
         self.processManager = pm
@@ -146,6 +152,7 @@ class ChatSessionViewModel: ObservableObject {
                 let errorMsg = ChatMessage(role: .error, content: error)
                 self.session.messages.append(errorMsg)
                 self.session.state = .error(error)
+                self.session.cliSessionBackend = nil
                 self.processManager = nil
                 self.notifyUpdate()
             }
@@ -162,8 +169,15 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     func selectModel(_ model: CodexModelOption) {
+        guard session.provider == .codex else { return }
         guard session.selectedModel != model else { return }
         session.selectedModel = model
+        notifyUpdate()
+    }
+
+    func updateProvider(_ provider: CLIBackend) {
+        guard session.provider != provider else { return }
+        session.provider = provider
         notifyUpdate()
     }
 
@@ -398,7 +412,8 @@ class ChatSessionViewModel: ObservableObject {
 
     private func updateChatHeadSymbolFromFirstMessage(prompt: String, attachments: [ChatAttachment]) {
         guard chatHeadSymbolProcess == nil else { return }
-        guard let backend = backend, let path = backend.resolvedPath() else { return }
+        let backend = session.provider
+        guard let path = backend.resolvedPath() else { return }
 
         let seed = buildChatHeadSymbolSeed(userPrompt: prompt, attachments: attachments)
         guard !seed.isEmpty else { return }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatHeadView: View {
     let session: ChatSession
+    let showProviderBadge: Bool
     let isExpanded: Bool
     let onTap: () -> Void
     var morphNamespace: Namespace.ID
@@ -46,6 +47,11 @@ struct ChatHeadView: View {
             Text(session.displayChatHeadSymbol)
                 .font(DesignTokens.headInitialFont)
                 .foregroundColor(DesignTokens.textPrimary)
+
+            if showProviderBadge {
+                ProviderBadgeView(provider: session.provider, compact: true)
+                    .offset(y: 21)
+            }
 
             // Selection ring — animated stroke
             Circle()
@@ -252,6 +258,91 @@ struct ChatHeadView: View {
 private struct ChatHeadPreviewContent {
     let senderLabel: String
     let message: String
+}
+
+struct ProviderBadgeView: View {
+    let provider: CLIBackend
+    var compact: Bool = false
+
+    var body: some View {
+        HStack(spacing: compact ? 4 : 6) {
+            Image(systemName: provider.badgeSymbolName)
+                .font(.system(size: compact ? 7 : 9, weight: .bold))
+
+            Text(compact ? provider.compactBadgeText : provider.shortLabel)
+                .font(.system(size: compact ? 8 : 10, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundColor(provider.badgeForegroundColor)
+        .padding(.horizontal, compact ? 6 : 8)
+        .padding(.vertical, compact ? 3 : 5)
+        .background(
+            Capsule()
+                .fill(provider.badgeFillColor)
+        )
+        .overlay(
+            Capsule()
+                .stroke(provider.badgeStrokeColor, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(compact ? 0.1 : 0.08), radius: compact ? 2 : 3, y: 1)
+    }
+}
+
+private extension CLIBackend {
+    var compactBadgeText: String {
+        switch self {
+        case .codex:
+            return "CX"
+        case .copilot:
+            return "GH"
+        case .claude:
+            return "CL"
+        }
+    }
+
+    var badgeSymbolName: String {
+        switch self {
+        case .codex:
+            return "cpu"
+        case .copilot:
+            return "chevron.left.forwardslash.chevron.right"
+        case .claude:
+            return "text.bubble"
+        }
+    }
+
+    var badgeFillColor: Color {
+        switch self {
+        case .codex:
+            return Color(red: 0.86, green: 0.92, blue: 0.98)
+        case .copilot:
+            return Color(red: 0.89, green: 0.95, blue: 0.90)
+        case .claude:
+            return Color(red: 0.98, green: 0.91, blue: 0.84)
+        }
+    }
+
+    var badgeStrokeColor: Color {
+        switch self {
+        case .codex:
+            return Color(red: 0.53, green: 0.68, blue: 0.83).opacity(0.8)
+        case .copilot:
+            return Color(red: 0.46, green: 0.66, blue: 0.48).opacity(0.8)
+        case .claude:
+            return Color(red: 0.78, green: 0.56, blue: 0.33).opacity(0.8)
+        }
+    }
+
+    var badgeForegroundColor: Color {
+        switch self {
+        case .codex:
+            return Color(red: 0.16, green: 0.29, blue: 0.44)
+        case .copilot:
+            return Color(red: 0.12, green: 0.31, blue: 0.18)
+        case .claude:
+            return Color(red: 0.45, green: 0.24, blue: 0.08)
+        }
+    }
 }
 
 private struct ChatHeadPreviewBubble: View {

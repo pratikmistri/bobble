@@ -6,10 +6,12 @@ struct ChatSession: Identifiable {
     let id: UUID
     var name: String
     var chatHeadSymbol: String
+    var provider: CLIBackend
     var selectedModel: CodexModelOption
     var messages: [ChatMessage]
     var state: SessionState
     var cliSessionId: String
+    var cliSessionBackend: CLIBackend?
     var workspaceDirectory: String
 
     enum SessionState {
@@ -39,15 +41,17 @@ struct ChatSession: Identifiable {
         return directoryURL.path
     }
 
-    init(name: String = "New Chat") {
+    init(name: String = "New Chat", provider: CLIBackend = .codex) {
         let newId = UUID()
         self.id = newId
         self.name = name
         self.chatHeadSymbol = Self.defaultChatHeadSymbol
+        self.provider = provider
         self.selectedModel = .default
         self.messages = []
         self.state = .idle
         self.cliSessionId = UUID().uuidString
+        self.cliSessionBackend = nil
         self.workspaceDirectory = Self.createWorkspaceDirectory(for: newId)
     }
 

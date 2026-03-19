@@ -5,7 +5,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainPanel: FloatingPanel!
     private let manager = ChatHeadsManager()
     private let positionManager = WindowPositionManager()
+    private let usageMonitor = UsageMonitor()
     private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
+    private var providerMenuItems: [CLIBackend: NSMenuItem] = [:]
+    private var usageMenuItems: [CLIBackend: UsageMenuItemGroup] = [:]
+    private var refreshUsageMenuItem: NSMenuItem?
+    private var isRefreshingUsage = false
     private var isCollapsingSession = false
     private var panelAnchor: NSPoint = .zero
     private var lastDragMouseLocation: NSPoint?
@@ -30,10 +36,105 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "bubble.left.fill", accessibilityDescription: "Bobble")
+            button.toolTip = "Bobble"
         }
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit Bobble", action: #selector(quitApp), keyEquivalent: "q"))
+        let menu = makeStatusMenu()
+        statusMenu = menu
         statusItem?.menu = menu
+        manager.onSelectedProviderChanged = { [weak self] provider in
+            DispatchQueue.main.async {
+                self?.updateProviderMenuSelection(provider)
+            }
+        }
+        refreshUsage()
+    }
+
+    private func makeStatusMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.delegate = self
+
+        let providerRoot = NSMenuItem(title: "Provider", action: nil, keyEquivalent: "")
+        let providerSubmenu = NSMenu()
+        providerMenuItems.removeAll()
+
+        for provider in CLIBackend.allCases {
+            let item = NSMenuItem(
+                title: provider.displayName,
+                action: #selector(selectProvider(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = provider.rawValue
+            providerMenuItems[provider] = item
+            providerSubmenu.addItem(item)
+        }
+
+        providerRoot.submenu = providerSubmenu
+        menu.addItem(providerRoot)
+        menu.addItem(.separator())
+
+        let usageHeader = NSMenuItem(title: "Usage", action: nil, keyEquivalent: "")
+        usageHeader.isEnabled = false
+        menu.addItem(usageHeader)
+        usageMenuItems.removeAll()
+
+        for provider in CLIBackend.allCases {
+            let item = NSMenuItem()
+            item.isEnabled = false
+
+            let rowView = UsageMenuRowView()
+            rowView.apply(.loading(for: provider))
+            item.view = rowView
+
+            usageMenuItems[provider] = UsageMenuItemGroup(item: item, rowView: rowView)
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+
+        let refreshUsageItem = NSMenuItem(title: "Refresh Usage", action: #selector(refreshUsageMenuAction(_:)), keyEquivalent: "")
+        refreshUsageItem.target = self
+        refreshUsageMenuItem = refreshUsageItem
+        menu.addItem(refreshUsageItem)
+
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Quit Bobble", action: #selector(quitApp), keyEquivalent: "q"))
+
+        updateProviderMenuSelection(manager.selectedProvider)
+        return menu
+    }
+
+    private func updateProviderMenuSelection(_ provider: CLIBackend) {
+        for (candidate, item) in providerMenuItems {
+            item.state = candidate == provider ? .on : .off
+        }
+
+        statusItem?.button?.toolTip = "Bobble (\(provider.displayName))"
+    }
+
+    private func refreshUsage(force: Bool = false) {
+        guard !isRefreshingUsage else { return }
+
+        isRefreshingUsage = true
+        refreshUsageMenuItem?.title = "Refreshing Usage..."
+        refreshUsageMenuItem?.isEnabled = false
+
+        usageMonitor.refresh(force: force) { [weak self] summaries in
+            guard let self else { return }
+
+            for provider in CLIBackend.allCases {
+                guard let group = self.usageMenuItems[provider] else { continue }
+                let summary = summaries[provider] ?? ProviderUsageSummary.unavailable(
+                    for: provider,
+                    caption: "No local usage source found."
+                )
+                group.rowView.apply(summary)
+            }
+
+            self.refreshUsageMenuItem?.title = "Refresh Usage"
+            self.refreshUsageMenuItem?.isEnabled = true
+            self.isRefreshingUsage = false
+        }
     }
 
     private func setupMainPanel() {
@@ -78,6 +179,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         manager.onSessionAdded = { [weak self] session in
             self?.expandSession(session)
         }
+    }
+
+    @objc private func selectProvider(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let provider = CLIBackend(rawValue: rawValue) else {
+            return
+        }
+
+        manager.updateSelectedProvider(provider)
+    }
+
+    @objc private func refreshUsageMenuAction(_ sender: Any?) {
+        refreshUsage(force: true)
     }
 
     // MARK: - Session toggling
@@ -300,5 +414,484 @@ extension AppDelegate: NSWindowDelegate {
             self?.collapseSession()
         }
         return false
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusMenu else { return }
+        refreshUsage()
+    }
+}
+
+private struct UsageMenuItemGroup {
+    let item: NSMenuItem
+    let rowView: UsageMenuRowView
+}
+
+private struct ProviderUsageSummary {
+    let title: String
+    let valueText: String
+    let caption: String
+    let progressState: UsageProgressState
+
+    static func loading(for provider: CLIBackend) -> ProviderUsageSummary {
+        ProviderUsageSummary(
+            title: provider.displayName,
+            valueText: "Refreshing",
+            caption: "Scanning local usage sources...",
+            progressState: .indeterminate
+        )
+    }
+
+    static func unavailable(for provider: CLIBackend, caption: String) -> ProviderUsageSummary {
+        ProviderUsageSummary(
+            title: provider.displayName,
+            valueText: "Unavailable",
+            caption: caption,
+            progressState: .unavailable
+        )
+    }
+}
+
+private enum UsageProgressState {
+    case determinate(Double)
+    case indeterminate
+    case unavailable
+}
+
+private final class UsageMenuRowView: NSView {
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let valueLabel = NSTextField(labelWithString: "")
+    private let captionLabel = NSTextField(labelWithString: "")
+    private let progressIndicator = NSProgressIndicator()
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 264, height: 72)
+    }
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: 264, height: 72))
+
+        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+
+        valueLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        valueLabel.textColor = .secondaryLabelColor
+        valueLabel.alignment = .right
+        valueLabel.lineBreakMode = .byTruncatingHead
+
+        captionLabel.font = .systemFont(ofSize: 10)
+        captionLabel.textColor = .secondaryLabelColor
+        captionLabel.lineBreakMode = .byWordWrapping
+        captionLabel.cell?.wraps = true
+        captionLabel.cell?.usesSingleLineMode = false
+
+        progressIndicator.isIndeterminate = false
+        progressIndicator.minValue = 0
+        progressIndicator.maxValue = 1
+        progressIndicator.doubleValue = 0
+        progressIndicator.style = .bar
+        progressIndicator.controlSize = .small
+        progressIndicator.translatesAutoresizingMaskIntoConstraints = false
+
+        let headerStack = NSStackView(views: [titleLabel, valueLabel])
+        headerStack.orientation = .horizontal
+        headerStack.distribution = .fill
+        headerStack.alignment = .centerY
+        headerStack.spacing = 8
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let contentStack = NSStackView(views: [headerStack, progressIndicator, captionLabel])
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = 5
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(contentStack)
+
+        NSLayoutConstraint.activate([
+            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            contentStack.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+
+            headerStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            progressIndicator.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            progressIndicator.heightAnchor.constraint(equalToConstant: 10),
+            captionLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func apply(_ summary: ProviderUsageSummary) {
+        titleLabel.stringValue = summary.title
+        valueLabel.stringValue = summary.valueText
+        captionLabel.stringValue = summary.caption
+
+        switch summary.progressState {
+        case .determinate(let fraction):
+            progressIndicator.stopAnimation(nil)
+            progressIndicator.isIndeterminate = false
+            progressIndicator.minValue = 0
+            progressIndicator.maxValue = 1
+            progressIndicator.doubleValue = max(0, min(fraction, 1))
+            progressIndicator.alphaValue = 1
+        case .indeterminate:
+            progressIndicator.isIndeterminate = true
+            progressIndicator.alphaValue = 1
+            progressIndicator.startAnimation(nil)
+        case .unavailable:
+            progressIndicator.stopAnimation(nil)
+            progressIndicator.isIndeterminate = false
+            progressIndicator.minValue = 0
+            progressIndicator.maxValue = 1
+            progressIndicator.doubleValue = 0
+            progressIndicator.alphaValue = 0.45
+        }
+    }
+}
+
+private final class UsageMonitor {
+    private let fileManager = FileManager.default
+    private let queue = DispatchQueue(label: "Bobble.UsageMonitor", qos: .utility)
+    private let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private let codexPlaceholderPromptLimit = 135
+    private let claudePlaceholderPromptLimit = 25
+    private let copilotPlaceholderPremiumRequests = 300
+
+    private var cachedSummaries: [CLIBackend: ProviderUsageSummary]?
+    private var lastRefreshDate: Date?
+    private let cacheLifetime: TimeInterval = 60
+
+    func refresh(force: Bool = false, completion: @escaping ([CLIBackend: ProviderUsageSummary]) -> Void) {
+        queue.async {
+            if !force,
+               let cachedSummaries = self.cachedSummaries,
+               let lastRefreshDate = self.lastRefreshDate,
+               Date().timeIntervalSince(lastRefreshDate) < self.cacheLifetime {
+                DispatchQueue.main.async {
+                    completion(cachedSummaries)
+                }
+                return
+            }
+
+            let summaries = [
+                CLIBackend.codex: self.loadCodexSummary(),
+                CLIBackend.copilot: self.loadCopilotSummary(),
+                CLIBackend.claude: self.loadClaudeSummary(),
+            ]
+
+            self.cachedSummaries = summaries
+            self.lastRefreshDate = Date()
+
+            DispatchQueue.main.async {
+                completion(summaries)
+            }
+        }
+    }
+
+    private func loadCodexSummary() -> ProviderUsageSummary {
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        let databaseURL = homeURL.appendingPathComponent(".codex/state_5.sqlite", isDirectory: false)
+
+        guard fileManager.fileExists(atPath: databaseURL.path) else {
+            return .unavailable(for: .codex, caption: "OpenAI docs placeholder: ~\(codexPlaceholderPromptLimit) local messages per 5h.")
+        }
+
+        let startOfDayTimestamp = Int(Self.calendar.startOfDay(for: Date()).timeIntervalSince1970)
+        let query = """
+        SELECT
+            COALESCE(SUM(CASE WHEN updated_at >= \(startOfDayTimestamp) THEN tokens_used ELSE 0 END), 0),
+            COALESCE(SUM(tokens_used), 0)
+        FROM threads;
+        """
+
+        guard let output = runProcess(
+            executablePath: "/usr/bin/sqlite3",
+            arguments: [databaseURL.path, "-separator", "\t", query]
+        ) else {
+            return .unavailable(for: .codex, caption: "Could not read ~/.codex/state_5.sqlite.")
+        }
+
+        let parts = output
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "\t", omittingEmptySubsequences: false)
+
+        guard parts.count >= 2,
+              let todayTokens = Int(parts[0]),
+              let totalTokens = Int(parts[1]) else {
+            return .unavailable(for: .codex, caption: "OpenAI docs placeholder: ~\(codexPlaceholderPromptLimit) local messages per 5h.")
+        }
+
+        let promptCount = countCodexPrompts(since: Date().addingTimeInterval(-5 * 60 * 60))
+        let fraction = Double(promptCount) / Double(codexPlaceholderPromptLimit)
+
+        return ProviderUsageSummary(
+            title: CLIBackend.codex.displayName,
+            valueText: "\(promptCount)/\(codexPlaceholderPromptLimit) est",
+            caption: "5h placeholder from OpenAI docs. \(Self.formatTokenCount(todayTokens)) tokens today, \(Self.formatTokenCount(totalTokens)) local total.",
+            progressState: .determinate(fraction)
+        )
+    }
+
+    private func loadClaudeSummary() -> ProviderUsageSummary {
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        let projectsURL = homeURL.appendingPathComponent(".claude/projects", isDirectory: true)
+
+        guard fileManager.fileExists(atPath: projectsURL.path) else {
+            return .unavailable(for: .claude, caption: "No local Claude session logs found.")
+        }
+
+        let startOfDay = Self.calendar.startOfDay(for: Date())
+        let fiveHourCutoff = Date().addingTimeInterval(-5 * 60 * 60)
+        var todayTokens = 0
+        var totalTokens = 0
+        var sawUsage = false
+        var seenRequestIds = Set<String>()
+        var recentPromptCount = 0
+        var seenPromptIds = Set<String>()
+
+        guard let enumerator = fileManager.enumerator(
+            at: projectsURL,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return .unavailable(for: .claude, caption: "Could not enumerate ~/.claude/projects.")
+        }
+
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "jsonl" else { continue }
+
+            do {
+                let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+                guard resourceValues.isRegularFile == true else { continue }
+            } catch {
+                continue
+            }
+
+            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+
+            content.enumerateLines { line, _ in
+                if let promptData = line.data(using: .utf8),
+                   let promptJSON = try? JSONSerialization.jsonObject(with: promptData) as? [String: Any],
+                   let type = promptJSON["type"] as? String,
+                   type == "user",
+                   let message = promptJSON["message"] as? [String: Any],
+                   let role = message["role"] as? String,
+                   role == "user",
+                   let content = message["content"] as? String,
+                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let promptIdentifier = promptJSON["uuid"] as? String,
+                   seenPromptIds.insert(promptIdentifier).inserted,
+                   let timestamp = promptJSON["timestamp"] as? String,
+                   let date = self.parseISODate(timestamp),
+                   date >= fiveHourCutoff {
+                    recentPromptCount += 1
+                }
+
+                guard line.contains("\"type\":\"assistant\""),
+                      line.contains("\"usage\""),
+                      let data = line.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let type = json["type"] as? String,
+                      type == "assistant",
+                      let message = json["message"] as? [String: Any] else {
+                    return
+                }
+
+                let requestIdentifier = (json["requestId"] as? String)
+                    ?? (message["id"] as? String)
+                    ?? (json["uuid"] as? String)
+
+                guard let requestIdentifier, seenRequestIds.insert(requestIdentifier).inserted,
+                      let usage = message["usage"] as? [String: Any] else {
+                    return
+                }
+
+                let inputTokens = usage["input_tokens"] as? Int ?? 0
+                let outputTokens = usage["output_tokens"] as? Int ?? 0
+                let directTokens = inputTokens + outputTokens
+
+                totalTokens += directTokens
+                sawUsage = sawUsage || directTokens > 0
+
+                guard let timestamp = json["timestamp"] as? String,
+                      let date = self.parseISODate(timestamp) else {
+                    return
+                }
+
+                if date >= startOfDay {
+                    todayTokens += directTokens
+                }
+            }
+        }
+
+        guard sawUsage else {
+            return .unavailable(for: .claude, caption: "Anthropic docs placeholder: ~\(claudePlaceholderPromptLimit) Claude Code prompts per 5h.")
+        }
+
+        let fraction = Double(recentPromptCount) / Double(claudePlaceholderPromptLimit)
+
+        return ProviderUsageSummary(
+            title: CLIBackend.claude.displayName,
+            valueText: "\(recentPromptCount)/\(claudePlaceholderPromptLimit) est",
+            caption: "5h placeholder from Anthropic docs. \(Self.formatTokenCount(todayTokens)) direct tokens today, \(Self.formatTokenCount(totalTokens)) total.",
+            progressState: .determinate(fraction)
+        )
+    }
+
+    private func loadCopilotSummary() -> ProviderUsageSummary {
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        let copilotLogsURL = homeURL
+            .appendingPathComponent("Library/Application Support/Code/User/globalStorage/github.copilot-chat", isDirectory: true)
+
+        let hasCLI = CLIBackend.copilot.resolvedPath() != nil
+        let hasLocalLogs = fileManager.fileExists(atPath: copilotLogsURL.path)
+
+        if hasCLI && hasLocalLogs {
+            return ProviderUsageSummary(
+                title: CLIBackend.copilot.displayName,
+                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
+                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
+                progressState: .determinate(0)
+            )
+        }
+
+        if hasCLI {
+            return ProviderUsageSummary(
+                title: CLIBackend.copilot.displayName,
+                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
+                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
+                progressState: .determinate(0)
+            )
+        }
+
+        if hasLocalLogs {
+            return ProviderUsageSummary(
+                title: CLIBackend.copilot.displayName,
+                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
+                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
+                progressState: .determinate(0)
+            )
+        }
+
+        return ProviderUsageSummary(
+            title: CLIBackend.copilot.displayName,
+            valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
+            caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
+            progressState: .determinate(0)
+        )
+    }
+
+    private func parseISODate(_ value: String) -> Date? {
+        if let date = isoFormatter.date(from: value) {
+            return date
+        }
+
+        return Self.fallbackISOFormatter.date(from: value)
+    }
+
+    private func runProcess(executablePath: String, arguments: [String]) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+
+        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        guard !data.isEmpty else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func countCodexPrompts(since cutoff: Date) -> Int {
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        let databaseURL = homeURL.appendingPathComponent(".codex/state_5.sqlite", isDirectory: false)
+        guard fileManager.fileExists(atPath: databaseURL.path) else { return 0 }
+
+        let cutoffTimestamp = Int(cutoff.timeIntervalSince1970)
+        let query = "SELECT rollout_path FROM threads WHERE updated_at >= \(cutoffTimestamp);"
+
+        guard let output = runProcess(
+            executablePath: "/usr/bin/sqlite3",
+            arguments: [databaseURL.path, query]
+        ) else {
+            return 0
+        }
+
+        let paths = output
+            .split(separator: "\n")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !paths.isEmpty else { return 0 }
+
+        var count = 0
+
+        for path in paths {
+            let fileURL = URL(fileURLWithPath: path, isDirectory: false)
+            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+
+            content.enumerateLines { line, _ in
+                guard let data = line.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let type = json["type"] as? String,
+                      type == "event_msg",
+                      let timestamp = json["timestamp"] as? String,
+                      let date = self.parseISODate(timestamp),
+                      date >= cutoff,
+                      let payload = json["payload"] as? [String: Any],
+                      let payloadType = payload["type"] as? String,
+                      payloadType == "user_message" else {
+                    return
+                }
+
+                count += 1
+            }
+        }
+
+        return count
+    }
+
+    private static let calendar = Calendar.current
+
+    private static let fallbackISOFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+        return formatter
+    }()
+
+    private static func formatTokenCount(_ count: Int) -> String {
+        switch count {
+        case 1_000_000...:
+            return String(format: "%.1fM", Double(count) / 1_000_000.0)
+        case 10_000...:
+            return String(format: "%.0fK", Double(count) / 1_000.0)
+        case 1_000...:
+            return String(format: "%.1fK", Double(count) / 1_000.0)
+        default:
+            return "\(count)"
+        }
     }
 }

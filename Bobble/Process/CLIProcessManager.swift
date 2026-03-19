@@ -118,6 +118,7 @@ class CLIProcessManager {
             // Give a moment for final data to flush
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                self?.parser.finish()
                 if proc.terminationStatus != 0 {
                     let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                     let stderrText = String(data: stderrData, encoding: .utf8) ?? "Unknown error"
@@ -164,6 +165,14 @@ class CLIProcessManager {
                 args += ["--session-id", sessionId]
             }
             return args
+
+        case .copilot:
+            return [
+                "--prompt", prompt,
+                "--silent",
+                "--no-ask-user",
+                "--allow-all-tools"
+            ] + modelArguments
 
         case .codex:
             if isResume {

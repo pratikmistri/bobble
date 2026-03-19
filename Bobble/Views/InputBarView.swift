@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct InputBarView: View {
     @ObservedObject var viewModel: ChatSessionViewModel
+    let showProviderBadge: Bool
 
     @State private var sendBounce = false
     @State private var isDropTargeted = false
@@ -69,8 +70,13 @@ struct InputBarView: View {
                     .disabled(viewModel.isCapturingScreenshot)
                     .help("Capture screenshot")
 
-                    ModelPickerMenu(selectedModel: viewModel.session.selectedModel) { model in
-                        viewModel.selectModel(model)
+                    if viewModel.session.provider == .codex {
+                        ModelPickerMenu(selectedModel: viewModel.session.selectedModel) { model in
+                            viewModel.selectModel(model)
+                        }
+                    } else if showProviderBadge {
+                        ProviderBadgeView(provider: viewModel.session.provider)
+                            .help("Switch providers from the menu bar icon")
                     }
                 }
 
