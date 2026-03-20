@@ -18,39 +18,29 @@ struct ChatHeadView: View {
     @State private var previewTask: Task<Void, Never>?
 
     var body: some View {
+        let headCornerRadius = DesignTokens.headDiameter / 2
+
         ZStack {
-            // Main circle — participates in matchedGeometryEffect morph
-            if #available(macOS 26.0, *) {
-                Circle()
-                    .fill(.clear)
-                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .matchedGeometryEffect(
-                        id: session.id,
-                        in: morphNamespace,
-                        properties: .frame,
-                        anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
-                    )
-            } else {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity((isHovering || isDropTargeted) ? 0.58 : 0.44), lineWidth: 1)
-                    )
-                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                    .matchedGeometryEffect(
-                        id: session.id,
-                        in: morphNamespace,
-                        properties: .frame,
-                        anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
-                    )
-                    .shadow(
-                        color: .black.opacity((isHovering || isDropTargeted) ? 0.22 : 0.12),
-                        radius: (isHovering || isDropTargeted) ? 9 : DesignTokens.headShadowRadius,
-                        y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
-                    )
-            }
+            // Main shell — participates in matchedGeometryEffect morph
+            RoundedRectangle(cornerRadius: headCornerRadius, style: .continuous)
+                .fill(DesignTokens.surfaceColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: headCornerRadius, style: .continuous)
+                        .strokeBorder(DesignTokens.borderColor.opacity((isHovering || isDropTargeted) ? 0.92 : 0.8), lineWidth: 1)
+                )
+                .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                .matchedGeometryEffect(
+                    id: session.id,
+                    in: morphNamespace,
+                    properties: [.frame, .position],
+                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
+                    isSource: true
+                )
+                .shadow(
+                    color: .black.opacity((isHovering || isDropTargeted) ? 0.22 : 0.12),
+                    radius: (isHovering || isDropTargeted) ? 9 : DesignTokens.headShadowRadius,
+                    y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
+                )
 
             // Model-chosen chat marker
             Text(session.displayChatHeadSymbol)

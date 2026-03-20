@@ -229,10 +229,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stopPhysics()
 
         // Pre-size the panel so the head->window morph has enough room immediately.
+        // Keep the current dock edge and bottom edge locked to avoid visible drift.
         let size = positionManager.expandedPanelSize(headsCount: manager.sessions.count)
-        manager.panelDockSide = preferredDockSideForCurrentFrame()
-        panelAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: manager.panelDockSide)
-        let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor, dockSide: manager.panelDockSide)
+        let dockSide = manager.panelDockSide
+        let currentFrame = mainPanel.frame
+        let proposedOriginX: CGFloat
+
+        switch dockSide {
+        case .leading:
+            proposedOriginX = currentFrame.minX
+        case .trailing:
+            proposedOriginX = currentFrame.maxX - size.width
+        }
+
+        let proposedOrigin = NSPoint(x: proposedOriginX, y: currentFrame.minY)
+        let origin = positionManager.constrainedPanelOrigin(proposedOrigin, for: size, dockSide: dockSide)
+        panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: dockSide)
+        manager.panelDockSide = dockSide
 
         // Resize panel synchronously
         mainPanel.setFrame(NSRect(origin: origin, size: size), display: true)

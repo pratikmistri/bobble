@@ -97,6 +97,7 @@ struct BobbleRootView: View {
                let session = manager.sessions.first(where: { $0.id == sessionId }),
                let viewModel = manager.viewModel(for: sessionId) {
                 let isDeletingExpandedSession = manager.deletingSessionId == sessionId
+                let shellCornerRadius = DesignTokens.headDiameter / 2
 
                 HStack(spacing: 0) {
                     if dockSide == .trailing {
@@ -105,17 +106,18 @@ struct BobbleRootView: View {
                     }
 
                     ZStack {
-                        RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                        RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
                             .fill(DesignTokens.surfaceColor)
                             .overlay(
-                                RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
                                     .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
                             )
                             .matchedGeometryEffect(
                                 id: session.id,
                                 in: morphNamespace,
-                                properties: .frame,
-                                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
+                                properties: [.frame, .position],
+                                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
+                                isSource: false
                             )
 
                         ChatContentView(
@@ -129,7 +131,7 @@ struct BobbleRootView: View {
                             }
                         )
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius))
+                    .clipShape(RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous))
                     .shadow(color: .black.opacity(0.15), radius: DesignTokens.panelShadowRadius)
                     .frame(width: chatWidth, height: chatHeight)
 
