@@ -12,7 +12,6 @@ struct WindowPositionManager {
     private let screenMargin: CGFloat = DesignTokens.screenMargin
     private let chatWidth: CGFloat = 320
     private let chatHeight: CGFloat = 480
-    private let vStackSpacing: CGFloat = 8
     private let leadingOverflow: CGFloat = DesignTokens.headPreviewOverflow
     private let headDockInset: CGFloat = DesignTokens.headInset + DesignTokens.headVisualPadding
 
@@ -34,28 +33,45 @@ struct WindowPositionManager {
         )
     }
 
-    // MARK: - Expanded state (deck of heads + chat window)
+    // MARK: - Expanded state (inline chat + stacked controls)
 
-    func expandedPanelSize(headsCount: Int) -> NSSize {
+    func expandedPanelSize(headsCount: Int, expandedIndex: Int? = nil) -> NSSize {
         let stackCount = max(headsCount, 0)
         let inset = DesignTokens.headInset * 2
 
+        let clampedExpandedIndex: Int? = {
+            guard let expandedIndex, stackCount > 0 else { return nil }
+            return min(max(expandedIndex, 0), stackCount - 1)
+        }()
+        let aboveCount = clampedExpandedIndex ?? 0
+        let belowCount = clampedExpandedIndex.map { max(stackCount - $0 - 1, 0) } ?? 0
+
         let addH = headDiameter
         let historyH = headDiameter
-        let stackH = stackCount > 0
-            ? (CGFloat(stackCount) * headDiameter)
-                + (CGFloat(stackCount - 1) * headSpacing)
-                + headVisualPadding
-            : 0
-        let headsGap = stackCount > 0 ? headSpacing : 0
-        let controlsGap = headSpacing
-        let headsSection = inset + addH + controlsGap + historyH + headsGap + stackH
+        let topStackCount = aboveCount
+        let bottomStackCount = belowCount
 
-        let totalH = headsSection + vStackSpacing + chatHeight
+        var rows: [CGFloat] = [addH, historyH]
+        if topStackCount > 0 {
+            rows.append(deckStackHeight(for: topStackCount))
+        }
+        rows.append(chatHeight)
+        if bottomStackCount > 0 {
+            rows.append(deckStackHeight(for: bottomStackCount))
+        }
+
+        let rowsHeight = rows.reduce(0, +)
+        let rowSpacing = CGFloat(max(rows.count - 1, 0)) * headSpacing
+        let totalH = inset + rowsHeight + rowSpacing
         return NSSize(
             width: chatWidth + DesignTokens.headPreviewOverflow,
             height: totalH
         )
+    }
+
+    private func deckStackHeight(for count: Int) -> CGFloat {
+        guard count > 0 else { return 0 }
+        return headDiameter + (CGFloat(count - 1) * DesignTokens.deckOffset) + headVisualPadding
     }
 
     // MARK: - Panel anchor and origin

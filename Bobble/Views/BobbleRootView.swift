@@ -19,28 +19,29 @@ struct BobbleRootView: View {
     private let previewOverflow: CGFloat = DesignTokens.headPreviewOverflow
 
     private var isExpanded: Bool { manager.expandedSessionId != nil }
-    private var isHeadsDeckMode: Bool { isExpanded }
-    private var headVisualPadding: CGFloat { DesignTokens.headVisualPadding }
     private var dockSide: PanelDockSide { manager.panelDockSide }
+    private var headVisualPadding: CGFloat { DesignTokens.headVisualPadding }
 
-    private var visibleSessions: [ChatSession] {
-        manager.sessions.filter { $0.id != manager.expandedSessionId }
+    private var expandedSession: ChatSession? {
+        guard let id = manager.expandedSessionId else { return nil }
+        return manager.sessions.first(where: { $0.id == id })
     }
 
-    private var headsSlotCount: Int {
-        let virtualExpandedSlot = isHeadsDeckMode && !manager.sessions.isEmpty ? 1 : 0
-        return visibleSessions.count + virtualExpandedSlot
+    private var expandedSessionIndex: Int? {
+        guard let id = manager.expandedSessionId else { return nil }
+        return manager.sessions.firstIndex(where: { $0.id == id })
     }
 
-    private var headsFrameHeight: CGFloat {
-        let count = headsSlotCount
-        guard count > 0 else { return 0 }
-        if isHeadsDeckMode {
-            return DesignTokens.headDiameter + CGFloat(count - 1) * DesignTokens.deckOffset
-        } else {
-            return CGFloat(count) * DesignTokens.headDiameter
-                + CGFloat(count - 1) * DesignTokens.headSpacing
-        }
+    private var expandedTopSessions: [ChatSession] {
+        guard let expandedSessionIndex else { return [] }
+        return Array(manager.sessions.prefix(expandedSessionIndex))
+    }
+
+    private var expandedBottomSessions: [ChatSession] {
+        guard let expandedSessionIndex else { return [] }
+        let nextIndex = manager.sessions.index(after: expandedSessionIndex)
+        guard nextIndex < manager.sessions.endIndex else { return [] }
+        return Array(manager.sessions[nextIndex...])
     }
 
     private var collapsedHeadsRenderHeight: CGFloat {
@@ -51,22 +52,8 @@ struct BobbleRootView: View {
         return collapsedFrameHeight + headVisualPadding
     }
 
-    private var headsRenderHeight: CGFloat {
-        let currentRenderHeight = headsFrameHeight + headVisualPadding
-        if isHeadsDeckMode {
-            return max(currentRenderHeight, collapsedHeadsRenderHeight)
-        }
-        return currentRenderHeight
-    }
-
     private var headsRenderWidth: CGFloat {
         DesignTokens.headDiameter + (headVisualPadding * 2)
-    }
-
-    private var controlsSectionHeight: CGFloat {
-        let controlsHeight = (DesignTokens.headDiameter * 2) + DesignTokens.headSpacing
-        let headsHeight = headsSlotCount == 0 ? 0 : (DesignTokens.headSpacing + headsRenderHeight)
-        return controlsHeight + headsHeight + (DesignTokens.headInset * 2)
     }
 
     private var headsLayoutAnimation: Animation? {
@@ -74,11 +61,15 @@ struct BobbleRootView: View {
         return isTransitioning ? nil : DesignTokens.motionLayout
     }
 
-    private func headYOffset(for index: Int) -> CGFloat {
-        let base = isHeadsDeckMode
-            ? CGFloat(index) * DesignTokens.deckOffset
-            : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
-        return base
+    private func collapsedHeadYOffset(for index: Int) -> CGFloat {
+        CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
+    }
+
+    private func cardStackHeight(for count: Int) -> CGFloat {
+        guard count > 0 else { return 0 }
+        return DesignTokens.headDiameter
+            + CGFloat(count - 1) * DesignTokens.deckOffset
+            + headVisualPadding
     }
 
     private var headsDragGesture: some Gesture {
@@ -93,108 +84,35 @@ struct BobbleRootView: View {
 
     var body: some View {
         ZStack(alignment: dockSide == .trailing ? .bottomTrailing : .bottomLeading) {
-            if let sessionId = manager.expandedSessionId,
-               let session = manager.sessions.first(where: { $0.id == sessionId }),
-               let viewModel = manager.viewModel(for: sessionId) {
-                let isDeletingExpandedSession = manager.deletingSessionId == sessionId
-                let shellCornerRadius = DesignTokens.headDiameter / 2
-
-                HStack(spacing: 0) {
-                    if dockSide == .trailing {
-                        Spacer(minLength: 0)
-                            .allowsHitTesting(false)
-                    }
-
-                    ZStack {
-                        RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
-                            .fill(DesignTokens.surfaceColor)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
-                                    .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
-                            )
-                            .matchedGeometryEffect(
-                                id: session.id,
-                                in: morphNamespace,
-                                properties: [.frame, .position],
-                                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
-                                isSource: false
-                            )
-
-                        ChatContentView(
-                            session: session,
-                            viewModel: viewModel,
-                            showProviderBadge: manager.hasMixedProviders,
-                            onClose: onClose,
-                            onMarkRead: { manager.markRead(sessionId: sessionId) },
-                            onArchive: {
-                                onArchiveSession(session)
-                            }
-                        )
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous))
-                    .shadow(color: .black.opacity(0.15), radius: DesignTokens.panelShadowRadius)
-                    .frame(width: chatWidth, height: chatHeight)
-
-                    if dockSide == .leading {
-                        Spacer(minLength: 0)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .frame(height: isDeletingExpandedSession ? 0 : chatHeight, alignment: .top)
-                .clipped()
-                .opacity(isDeletingExpandedSession ? 0 : 1)
-                .animation(DesignTokens.motionLayout, value: isDeletingExpandedSession)
-                .animation(DesignTokens.motionFade, value: isDeletingExpandedSession)
-                .padding(.bottom, controlsSectionHeight + 8)
-            }
-
             HStack(spacing: 0) {
                 if dockSide == .trailing {
                     Spacer(minLength: 0)
                         .allowsHitTesting(false)
                 }
 
-                VStack(spacing: DesignTokens.headSpacing) {
+                VStack(
+                    alignment: dockSide == .trailing ? .trailing : .leading,
+                    spacing: DesignTokens.headSpacing
+                ) {
                     addButton
-                    historyButton
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(headsDragGesture)
 
-                    if headsSlotCount > 0 {
-                        ZStack(alignment: .top) {
-                            ForEach(Array(visibleSessions.enumerated()), id: \.element.id) { index, session in
-                                ChatHeadView(
-                                    session: session,
-                                    showProviderBadge: manager.hasMixedProviders,
-                                    isExpanded: false,
-                                    dockSide: dockSide,
-                                    onTap: { onHeadTapped(session) },
-                                    onDropAttachments: { providers in
-                                        guard let viewModel = manager.viewModel(for: session.id) else {
-                                            return false
-                                        }
-                                        return viewModel.attachDroppedItems(from: providers)
-                                    },
-                                    morphNamespace: morphNamespace
-                                )
-                                .offset(y: headYOffset(for: index))
-                                .zIndex(Double(visibleSessions.count - index))
-                            }
-
-                            if isHeadsDeckMode {
-                                Color.clear
-                                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                                    .allowsHitTesting(false)
-                                    .offset(y: headYOffset(for: visibleSessions.count))
-                                    .zIndex(0)
-                            }
-                        }
-                        .frame(width: headsRenderWidth, height: headsRenderHeight, alignment: .top)
-                        .animation(headsLayoutAnimation, value: isExpanded)
-                        .animation(headsLayoutAnimation, value: headsSlotCount)
+                    if let session = expandedSession,
+                       let sessionId = manager.expandedSessionId,
+                       let viewModel = manager.viewModel(for: sessionId) {
+                        expandedContent(
+                            session: session,
+                            sessionId: sessionId,
+                            viewModel: viewModel
+                        )
+                    } else {
+                        collapsedContent
+                            .contentShape(Rectangle())
+                            .simultaneousGesture(headsDragGesture)
                     }
                 }
                 .padding(DesignTokens.headInset)
-                .contentShape(Rectangle())
-                .simultaneousGesture(headsDragGesture)
 
                 if dockSide == .leading {
                     Spacer(minLength: 0)
@@ -239,6 +157,125 @@ struct BobbleRootView: View {
                 }
             )
         }
+    }
+
+    @ViewBuilder
+    private var collapsedContent: some View {
+        historyButton
+
+        if !manager.sessions.isEmpty {
+            ZStack(alignment: .top) {
+                ForEach(Array(manager.sessions.enumerated()), id: \.element.id) { index, session in
+                    chatHeadButton(for: session)
+                        .offset(y: collapsedHeadYOffset(for: index))
+                        .zIndex(Double(manager.sessions.count - index))
+                }
+            }
+            .frame(width: headsRenderWidth, height: collapsedHeadsRenderHeight, alignment: .top)
+            .animation(headsLayoutAnimation, value: manager.sessions.count)
+            .animation(headsLayoutAnimation, value: isExpanded)
+        }
+    }
+
+    @ViewBuilder
+    private func expandedContent(
+        session: ChatSession,
+        sessionId: UUID,
+        viewModel: ChatSessionViewModel
+    ) -> some View {
+        historyButton
+            .contentShape(Rectangle())
+            .simultaneousGesture(headsDragGesture)
+
+        if !expandedTopSessions.isEmpty {
+            stackedHeadButtonsView(sessions: expandedTopSessions)
+                .contentShape(Rectangle())
+                .simultaneousGesture(headsDragGesture)
+                .animation(headsLayoutAnimation, value: expandedTopSessions.count)
+        }
+
+        expandedChatCard(session: session, sessionId: sessionId, viewModel: viewModel)
+
+        if !expandedBottomSessions.isEmpty {
+            stackedHeadButtonsView(sessions: expandedBottomSessions)
+                .contentShape(Rectangle())
+                .simultaneousGesture(headsDragGesture)
+                .animation(headsLayoutAnimation, value: expandedBottomSessions.count)
+        }
+    }
+
+    @ViewBuilder
+    private func stackedHeadButtonsView(sessions: [ChatSession]) -> some View {
+        ZStack(alignment: .top) {
+            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                chatHeadButton(for: session)
+                    .offset(y: CGFloat(index) * DesignTokens.deckOffset)
+                    .zIndex(Double(sessions.count - index))
+            }
+        }
+        .frame(width: headsRenderWidth, height: cardStackHeight(for: sessions.count), alignment: .top)
+    }
+
+    private func chatHeadButton(for session: ChatSession) -> some View {
+        ChatHeadView(
+            session: session,
+            showProviderBadge: manager.hasMixedProviders,
+            isExpanded: false,
+            dockSide: dockSide,
+            onTap: { onHeadTapped(session) },
+            onDropAttachments: { providers in
+                guard let viewModel = manager.viewModel(for: session.id) else {
+                    return false
+                }
+                return viewModel.attachDroppedItems(from: providers)
+            },
+            morphNamespace: morphNamespace
+        )
+    }
+
+    @ViewBuilder
+    private func expandedChatCard(
+        session: ChatSession,
+        sessionId: UUID,
+        viewModel: ChatSessionViewModel
+    ) -> some View {
+        let isDeletingExpandedSession = manager.deletingSessionId == sessionId
+        let shellCornerRadius = DesignTokens.headDiameter / 2
+
+        ZStack {
+            RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
+                .fill(DesignTokens.surfaceColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous)
+                        .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+                )
+                .matchedGeometryEffect(
+                    id: session.id,
+                    in: morphNamespace,
+                    properties: [.frame, .position],
+                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
+                    isSource: false
+                )
+
+            ChatContentView(
+                session: session,
+                viewModel: viewModel,
+                showProviderBadge: manager.hasMixedProviders,
+                onClose: onClose,
+                onMarkRead: { manager.markRead(sessionId: sessionId) },
+                onArchive: {
+                    onArchiveSession(session)
+                }
+            )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: shellCornerRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: DesignTokens.panelShadowRadius)
+        .frame(width: chatWidth, height: chatHeight)
+        .frame(height: isDeletingExpandedSession ? 0 : chatHeight, alignment: .top)
+        .clipped()
+        .opacity(isDeletingExpandedSession ? 0 : 1)
+        .animation(DesignTokens.motionLayout, value: isDeletingExpandedSession)
+        .animation(DesignTokens.motionFade, value: isDeletingExpandedSession)
     }
 
     private func floatingActionButton(

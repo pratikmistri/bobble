@@ -216,10 +216,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if manager.expandedSessionId == session.id {
             collapseSession()
         } else if manager.expandedSessionId != nil {
-            // Already expanded — switch to different session (no panel resize needed)
-            withAnimation(DesignTokens.motionLayout) {
-                manager.expandedSessionId = session.id
-            }
+            // Already expanded — resize for target index, then switch.
+            focusExpandedSession(session)
         } else {
             expandSession(session)
         }
@@ -230,7 +228,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Pre-size the panel so the head->window morph has enough room immediately.
         // Keep the current dock edge and bottom edge locked to avoid visible drift.
-        let size = positionManager.expandedPanelSize(headsCount: manager.sessions.count)
+        let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
+        let size = positionManager.expandedPanelSize(
+            headsCount: manager.sessions.count,
+            expandedIndex: expandedIndex
+        )
         let dockSide = manager.panelDockSide
         let currentFrame = mainPanel.frame
         let proposedOriginX: CGFloat
@@ -331,9 +333,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             if manager.expandedSessionId != nil {
-                withAnimation(DesignTokens.motionLayout) {
-                    manager.expandedSessionId = activeSession.id
-                }
+                focusExpandedSession(activeSession)
             } else {
                 expandSession(activeSession)
             }
@@ -343,11 +343,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = manager.restoreSessionFromHistory(session)
     }
 
+    private func focusExpandedSession(_ session: ChatSession) {
+        let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
+        let size = positionManager.expandedPanelSize(
+            headsCount: max(manager.sessions.count, 1),
+            expandedIndex: expandedIndex
+        )
+
+        let dockSide = manager.panelDockSide
+        let currentFrame = mainPanel.frame
+        let proposedOriginX: CGFloat
+
+        switch dockSide {
+        case .leading:
+            proposedOriginX = currentFrame.minX
+        case .trailing:
+            proposedOriginX = currentFrame.maxX - size.width
+        }
+
+        let proposedOrigin = NSPoint(x: proposedOriginX, y: currentFrame.minY)
+        let origin = positionManager.constrainedPanelOrigin(proposedOrigin, for: size, dockSide: dockSide)
+        panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: dockSide)
+        manager.panelDockSide = dockSide
+        mainPanel.setFrame(NSRect(origin: origin, size: size), display: true)
+
+        withAnimation(DesignTokens.motionLayout) {
+            manager.expandedSessionId = session.id
+        }
+    }
+
     private func updatePanelSize() {
         stopPhysics()
         let size: NSSize
         if manager.expandedSessionId != nil {
-            size = positionManager.expandedPanelSize(headsCount: max(manager.sessions.count, 1))
+            let expandedIndex = manager.expandedSessionId.flatMap { id in
+                manager.sessions.firstIndex(where: { $0.id == id })
+            }
+            size = positionManager.expandedPanelSize(
+                headsCount: max(manager.sessions.count, 1),
+                expandedIndex: expandedIndex
+            )
         } else {
             size = positionManager.collapsedPanelSize(count: manager.sessions.count)
         }
