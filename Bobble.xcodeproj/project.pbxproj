@@ -26,6 +26,7 @@
 		A10000017 /* InputBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000017 /* InputBarView.swift */; };
 		A10000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000018 /* Assets.xcassets */; };
 		A10000019 /* BobbleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021 /* BobbleRootView.swift */; };
+		A10000020 /* FloatingControlCircle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022 /* FloatingControlCircle.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +51,7 @@
 		B10000019 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000020 /* Bobble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bobble.entitlements; sourceTree = "<group>"; };
 		B10000021 /* BobbleRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BobbleRootView.swift; sourceTree = "<group>"; };
+		B10000022 /* FloatingControlCircle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingControlCircle.swift; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -127,6 +129,7 @@
 				B10000016 /* MessageBubbleView.swift */,
 				B10000017 /* InputBarView.swift */,
 				B10000021 /* BobbleRootView.swift */,
+				B10000022 /* FloatingControlCircle.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -246,6 +249,7 @@
 				A10000016 /* MessageBubbleView.swift in Sources */,
 				A10000017 /* InputBarView.swift in Sources */,
 				A10000019 /* BobbleRootView.swift in Sources */,
+				A10000020 /* FloatingControlCircle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

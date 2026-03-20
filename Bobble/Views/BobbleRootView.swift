@@ -56,6 +56,14 @@ struct BobbleRootView: View {
         DesignTokens.headDiameter + (headVisualPadding * 2)
     }
 
+    private var headColumnAlignment: Alignment {
+        dockSide == .trailing ? .topTrailing : .topLeading
+    }
+
+    private var headButtonFrameAlignment: Alignment {
+        dockSide == .trailing ? .trailing : .leading
+    }
+
     private var headsLayoutAnimation: Animation? {
         let isTransitioning = manager.deletingSessionId != nil
         return isTransitioning ? nil : DesignTokens.motionLayout
@@ -164,14 +172,14 @@ struct BobbleRootView: View {
         historyButton
 
         if !manager.sessions.isEmpty {
-            ZStack(alignment: .top) {
+            ZStack(alignment: headColumnAlignment) {
                 ForEach(Array(manager.sessions.enumerated()), id: \.element.id) { index, session in
                     chatHeadButton(for: session)
                         .offset(y: collapsedHeadYOffset(for: index))
                         .zIndex(Double(manager.sessions.count - index))
                 }
             }
-            .frame(width: headsRenderWidth, height: collapsedHeadsRenderHeight, alignment: .top)
+            .frame(width: headsRenderWidth, height: collapsedHeadsRenderHeight, alignment: headColumnAlignment)
             .animation(headsLayoutAnimation, value: manager.sessions.count)
             .animation(headsLayoutAnimation, value: isExpanded)
         }
@@ -206,14 +214,14 @@ struct BobbleRootView: View {
 
     @ViewBuilder
     private func stackedHeadButtonsView(sessions: [ChatSession]) -> some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: headColumnAlignment) {
             ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
                 chatHeadButton(for: session)
                     .offset(y: CGFloat(index) * DesignTokens.deckOffset)
                     .zIndex(Double(sessions.count - index))
             }
         }
-        .frame(width: headsRenderWidth, height: cardStackHeight(for: sessions.count), alignment: .top)
+        .frame(width: headsRenderWidth, height: cardStackHeight(for: sessions.count), alignment: headColumnAlignment)
     }
 
     private func chatHeadButton(for session: ChatSession) -> some View {
@@ -295,15 +303,7 @@ struct BobbleRootView: View {
                 .buttonBorderShape(.circle)
             } else {
                 Button(action: action) {
-                    ZStack {
-                        Circle()
-                            .fill(DesignTokens.addButtonColor.opacity(0.95))
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(DesignTokens.borderColor, lineWidth: 1.2)
-                            )
-                            .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-
+                    FloatingControlCircle {
                         Image(systemName: symbolName)
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(DesignTokens.textPrimary)
@@ -312,6 +312,7 @@ struct BobbleRootView: View {
                 .buttonStyle(.plain)
             }
         }
+        .frame(width: headsRenderWidth, alignment: headButtonFrameAlignment)
         .accessibilityLabel(accessibilityLabel)
     }
 }

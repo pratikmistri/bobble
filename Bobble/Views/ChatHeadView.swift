@@ -18,39 +18,33 @@ struct ChatHeadView: View {
     @State private var previewTask: Task<Void, Never>?
 
     var body: some View {
-        let headCornerRadius = DesignTokens.headDiameter / 2
+        let isHighlighted = isHovering || isDropTargeted
 
         ZStack {
-            // Main shell — participates in matchedGeometryEffect morph
-            RoundedRectangle(cornerRadius: headCornerRadius, style: .continuous)
-                .fill(DesignTokens.surfaceColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: headCornerRadius, style: .continuous)
-                        .strokeBorder(DesignTokens.borderColor.opacity((isHovering || isDropTargeted) ? 0.92 : 0.8), lineWidth: 1)
-                )
-                .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                .matchedGeometryEffect(
-                    id: session.id,
-                    in: morphNamespace,
-                    properties: [.frame, .position],
-                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
-                    isSource: true
-                )
-                .shadow(
-                    color: .black.opacity((isHovering || isDropTargeted) ? 0.22 : 0.12),
-                    radius: (isHovering || isDropTargeted) ? 9 : DesignTokens.headShadowRadius,
-                    y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
-                )
+            // Main shell — participates in matchedGeometryEffect morph.
+            Group {
+                if #available(macOS 26.0, *) {
+                    Circle()
+                        .fill(.clear)
+                        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                } else {
+                    FloatingControlCircle(isHighlighted: isHighlighted) {
+                        EmptyView()
+                    }
+                }
+            }
+            .matchedGeometryEffect(
+                id: session.id,
+                in: morphNamespace,
+                properties: [.frame, .position],
+                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
+                isSource: true
+            )
 
-            // Model-chosen chat marker
             Text(session.displayChatHeadSymbol)
                 .font(DesignTokens.headInitialFont)
                 .foregroundColor(DesignTokens.textPrimary)
-
-            if showProviderBadge {
-                ProviderBadgeView(provider: session.provider, compact: true)
-                    .offset(y: 21)
-            }
 
             // Selection ring — animated stroke
             Circle()
@@ -68,21 +62,30 @@ struct ChatHeadView: View {
                     height: DesignTokens.headDiameter + 10
                 )
                 .scaleEffect(isDropTargeted ? 1 : 0.92)
-
-            // Single top-right status indicator.
-            if let status = statusIndicator {
-                statusIndicatorView(for: status)
-                    .offset(x: 18, y: -18)
-                    .transition(.scale.combined(with: .opacity))
-            }
         }
+        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
         // Hover: lift + scale
-        .scaleEffect((isHovering || isDropTargeted) ? 1.04 : 1.0)
+        .scaleEffect(isHighlighted ? 1.04 : 1.0)
         .zIndex(isHovering || isDropTargeted || isShowingPreview ? 1000 : 0)
         .animation(DesignTokens.motionHover, value: isHovering)
         .animation(DesignTokens.motionHover, value: isDropTargeted)
         .animation(DesignTokens.motionLayout, value: isExpanded)
         .animation(DesignTokens.motionEntrance, value: isShowingPreview)
+        .overlay(alignment: .bottom) {
+            if showProviderBadge {
+                ProviderBadgeView(provider: session.provider, compact: true)
+                    .offset(y: 3)
+                    .allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let status = statusIndicator {
+                statusIndicatorView(for: status)
+                    .offset(x: 1, y: -1)
+                    .transition(.scale.combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
         .overlay(alignment: dockSide == .trailing ? .leading : .trailing) {
             if let preview = previewContent, isShowingPreview {
                 ChatHeadPreviewBubble(
