@@ -20,12 +20,11 @@ struct ChatHeadView: View {
     var body: some View {
         ZStack {
             // Main circle — participates in matchedGeometryEffect morph
-            Circle()
-                .fill(DesignTokens.surfaceAccent.opacity(0.95))
-                .overlay(
-                    Circle()
-                        .strokeBorder(DesignTokens.borderColor, lineWidth: 1.2)
-                )
+            ThinLiquidGlassBackground(
+                shape: Circle(),
+                emphasized: true,
+                isActive: isHovering || isDropTargeted
+            )
                 .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
                 .matchedGeometryEffect(
                     id: session.id,
@@ -33,20 +32,6 @@ struct ChatHeadView: View {
                     properties: .frame,
                     anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
                 )
-                .shadow(
-                    color: .black.opacity((isHovering || isDropTargeted) ? 0.26 : 0.16),
-                    radius: (isHovering || isDropTargeted) ? 10 : DesignTokens.headShadowRadius,
-                    y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
-                )
-
-            Circle()
-                .fill(.white.opacity(isHovering ? 0.38 : 0.28))
-                .frame(
-                    width: DesignTokens.headDiameter * 0.48,
-                    height: DesignTokens.headDiameter * 0.36
-                )
-                .blur(radius: 3)
-                .offset(x: -10, y: -11)
 
             // Model-chosen chat marker
             Text(session.displayChatHeadSymbol)

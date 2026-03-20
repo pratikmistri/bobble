@@ -22,7 +22,7 @@ struct WindowPositionManager {
         let controlRows = 2 // add + history
         let totalRows = count + controlRows
         let inset = DesignTokens.headInset * 2
-        let stackVisualOverflow = count > 0 ? headVisualPadding * 2 : 0
+        let stackVisualOverflow = count > 0 ? headVisualPadding : 0
         let height = CGFloat(totalRows) * headDiameter
             + CGFloat(max(totalRows - 1, 0)) * headSpacing
             + stackVisualOverflow
@@ -43,7 +43,7 @@ struct WindowPositionManager {
         let addH = headDiameter
         let historyH = headDiameter
         let deckH = nonExpanded > 0
-            ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset + (headVisualPadding * 2)
+            ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset + headVisualPadding
             : 0
         let headsGap = nonExpanded > 0 ? headSpacing : 0
         let controlsGap = headSpacing

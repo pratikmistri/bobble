@@ -593,6 +593,7 @@ private struct ProviderUsageSummary {
 private enum UsageProgressState {
     case determinate(Double)
     case indeterminate
+    case informational
     case unavailable
 }
 
@@ -686,6 +687,13 @@ private final class UsageMenuRowView: NSView {
             progressIndicator.isIndeterminate = true
             progressIndicator.alphaValue = 1
             progressIndicator.startAnimation(nil)
+        case .informational:
+            progressIndicator.stopAnimation(nil)
+            progressIndicator.isIndeterminate = false
+            progressIndicator.minValue = 0
+            progressIndicator.maxValue = 1
+            progressIndicator.doubleValue = 0
+            progressIndicator.alphaValue = 0.2
         case .unavailable:
             progressIndicator.stopAnimation(nil)
             progressIndicator.isIndeterminate = false
@@ -698,6 +706,21 @@ private final class UsageMenuRowView: NSView {
 }
 
 private final class UsageMonitor {
+    private struct CodexRateLimitSnapshot {
+        let primaryUsedPercent: Int?
+        let secondaryUsedPercent: Int?
+    }
+
+    private struct LocalUsageWindow {
+        var fiveHourTokens = 0
+        var todayTokens = 0
+        var fiveHourPrompts = 0
+        var todayPrompts = 0
+        var totalTokens = 0
+        var hasUsageData = false
+        var rateLimitSnapshot: CodexRateLimitSnapshot?
+    }
+
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "Bobble.UsageMonitor", qos: .utility)
     private let isoFormatter: ISO8601DateFormatter = {
@@ -705,9 +728,6 @@ private final class UsageMonitor {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
-    private let codexPlaceholderPromptLimit = 135
-    private let claudePlaceholderPromptLimit = 25
-    private let copilotPlaceholderPremiumRequests = 300
 
     private var cachedSummaries: [CLIBackend: ProviderUsageSummary]?
     private var lastRefreshDate: Date?
@@ -745,14 +765,18 @@ private final class UsageMonitor {
         let databaseURL = homeURL.appendingPathComponent(".codex/state_5.sqlite", isDirectory: false)
 
         guard fileManager.fileExists(atPath: databaseURL.path) else {
-            return .unavailable(for: .codex, caption: "OpenAI docs placeholder: ~\(codexPlaceholderPromptLimit) local messages per 5h.")
+            return .unavailable(for: .codex, caption: "No local Codex usage database found.")
         }
 
-        let startOfDayTimestamp = Int(Self.calendar.startOfDay(for: Date()).timeIntervalSince1970)
+        let now = Date()
+        let startOfDay = Self.calendar.startOfDay(for: now)
+        let startOfDayTimestamp = Int(startOfDay.timeIntervalSince1970)
+        let fiveHourCutoff = now.addingTimeInterval(-5 * 60 * 60)
+        let fiveHourCutoffTimestamp = Int(fiveHourCutoff.timeIntervalSince1970)
         let query = """
         SELECT
-            COALESCE(SUM(CASE WHEN updated_at >= \(startOfDayTimestamp) THEN tokens_used ELSE 0 END), 0),
-            COALESCE(SUM(tokens_used), 0)
+            COALESCE(SUM(tokens_used), 0),
+            GROUP_CONCAT(CASE WHEN updated_at >= \(min(startOfDayTimestamp, fiveHourCutoffTimestamp)) THEN rollout_path END, '\n')
         FROM threads;
         """
 
@@ -767,20 +791,102 @@ private final class UsageMonitor {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: "\t", omittingEmptySubsequences: false)
 
-        guard parts.count >= 2,
-              let todayTokens = Int(parts[0]),
-              let totalTokens = Int(parts[1]) else {
-            return .unavailable(for: .codex, caption: "OpenAI docs placeholder: ~\(codexPlaceholderPromptLimit) local messages per 5h.")
+        guard let totalTokens = parts.first.flatMap({ Int($0) }) else {
+            return .unavailable(for: .codex, caption: "Could not parse local Codex usage data.")
         }
 
-        let promptCount = countCodexPrompts(since: Date().addingTimeInterval(-5 * 60 * 60))
-        let fraction = Double(promptCount) / Double(codexPlaceholderPromptLimit)
+        let recentPaths = parts.count > 1
+            ? parts[1]
+                .split(separator: "\n")
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            : []
+
+        var stats = LocalUsageWindow()
+        stats.totalTokens = totalTokens
+
+        for path in Set(recentPaths) {
+            let fileURL = URL(fileURLWithPath: path, isDirectory: false)
+            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+
+            content.enumerateLines { line, _ in
+                guard let data = line.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let timestamp = json["timestamp"] as? String,
+                      let date = self.parseISODate(timestamp),
+                      let type = json["type"] as? String else {
+                    return
+                }
+
+                if type == "event_msg",
+                   let payload = json["payload"] as? [String: Any],
+                   let payloadType = payload["type"] as? String {
+                    if payloadType == "user_message" {
+                        if date >= fiveHourCutoff {
+                            stats.fiveHourPrompts += 1
+                        }
+                        if date >= startOfDay {
+                            stats.todayPrompts += 1
+                        }
+                    } else if payloadType == "token_count",
+                              let info = payload["info"] as? [String: Any] {
+                        let tokenTotal = self.integerValue(
+                            from: (info["last_token_usage"] as? [String: Any])?["total_tokens"]
+                        )
+                        let hasTokenData = tokenTotal > 0
+
+                        if date >= fiveHourCutoff {
+                            stats.fiveHourTokens += tokenTotal
+                        }
+                        if date >= startOfDay {
+                            stats.todayTokens += tokenTotal
+                        }
+                        if hasTokenData {
+                            stats.hasUsageData = true
+                        }
+
+                        if let rateLimits = payload["rate_limits"] as? [String: Any] {
+                            stats.rateLimitSnapshot = CodexRateLimitSnapshot(
+                                primaryUsedPercent: self.intPercent(from: rateLimits["primary_used_percent"]),
+                                secondaryUsedPercent: self.intPercent(from: rateLimits["secondary_used_percent"])
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        guard stats.hasUsageData || stats.fiveHourPrompts > 0 || stats.totalTokens > 0 else {
+            return .unavailable(for: .codex, caption: "No recent Codex token events found in local session logs.")
+        }
+
+        let valueText = stats.fiveHourTokens > 0
+            ? "\(Self.formatTokenCount(stats.fiveHourTokens)) tok / \(stats.fiveHourPrompts)p"
+            : "\(stats.fiveHourPrompts) prompts"
+
+        let progressState: UsageProgressState
+        var usageFragments = [
+            "Last 5h: \(Self.formatTokenCount(stats.fiveHourTokens)) tokens across \(stats.fiveHourPrompts) prompts.",
+            "Today: \(Self.formatTokenCount(stats.todayTokens)) tokens across \(stats.todayPrompts) prompts.",
+            "Local total: \(Self.formatTokenCount(stats.totalTokens)).",
+        ]
+
+        if let rateLimits = stats.rateLimitSnapshot,
+           let primaryUsedPercent = rateLimits.primaryUsedPercent {
+            progressState = .determinate(Double(primaryUsedPercent) / 100.0)
+            usageFragments.insert("Session window: \(primaryUsedPercent)% used.", at: 0)
+            if let secondaryUsedPercent = rateLimits.secondaryUsedPercent {
+                usageFragments.insert("Weekly window: \(secondaryUsedPercent)% used.", at: 1)
+            }
+        } else {
+            progressState = .informational
+        }
 
         return ProviderUsageSummary(
             title: CLIBackend.codex.displayName,
-            valueText: "\(promptCount)/\(codexPlaceholderPromptLimit) est",
-            caption: "5h placeholder from OpenAI docs. \(Self.formatTokenCount(todayTokens)) tokens today, \(Self.formatTokenCount(totalTokens)) local total.",
-            progressState: .determinate(fraction)
+            valueText: valueText,
+            caption: usageFragments.joined(separator: " "),
+            progressState: progressState
         )
     }
 
@@ -792,13 +898,13 @@ private final class UsageMonitor {
             return .unavailable(for: .claude, caption: "No local Claude session logs found.")
         }
 
-        let startOfDay = Self.calendar.startOfDay(for: Date())
-        let fiveHourCutoff = Date().addingTimeInterval(-5 * 60 * 60)
-        var todayTokens = 0
-        var totalTokens = 0
-        var sawUsage = false
+        let now = Date()
+        let startOfDay = Self.calendar.startOfDay(for: now)
+        let fiveHourCutoff = now.addingTimeInterval(-5 * 60 * 60)
+        let earliestRelevantDate = min(startOfDay, fiveHourCutoff)
+
+        var stats = LocalUsageWindow()
         var seenRequestIds = Set<String>()
-        var recentPromptCount = 0
         var seenPromptIds = Set<String>()
 
         guard let enumerator = fileManager.enumerator(
@@ -813,8 +919,12 @@ private final class UsageMonitor {
             guard fileURL.pathExtension == "jsonl" else { continue }
 
             do {
-                let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+                let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey])
                 guard resourceValues.isRegularFile == true else { continue }
+                if let modifiedAt = resourceValues.contentModificationDate,
+                   modifiedAt < earliestRelevantDate {
+                    continue
+                }
             } catch {
                 continue
             }
@@ -822,29 +932,28 @@ private final class UsageMonitor {
             guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
 
             content.enumerateLines { line, _ in
-                if let promptData = line.data(using: .utf8),
-                   let promptJSON = try? JSONSerialization.jsonObject(with: promptData) as? [String: Any],
-                   let type = promptJSON["type"] as? String,
-                   type == "user",
-                   let message = promptJSON["message"] as? [String: Any],
-                   let role = message["role"] as? String,
-                   role == "user",
-                   let content = message["content"] as? String,
-                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                   let promptIdentifier = promptJSON["uuid"] as? String,
-                   seenPromptIds.insert(promptIdentifier).inserted,
-                   let timestamp = promptJSON["timestamp"] as? String,
-                   let date = self.parseISODate(timestamp),
-                   date >= fiveHourCutoff {
-                    recentPromptCount += 1
-                }
-
-                guard line.contains("\"type\":\"assistant\""),
-                      line.contains("\"usage\""),
-                      let data = line.data(using: .utf8),
+                guard let data = line.data(using: .utf8),
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let type = json["type"] as? String,
-                      type == "assistant",
+                      let timestamp = json["timestamp"] as? String,
+                      let date = self.parseISODate(timestamp) else {
+                    return
+                }
+
+                if type == "user",
+                   let promptIdentifier = json["uuid"] as? String,
+                   seenPromptIds.insert(promptIdentifier).inserted,
+                   self.isClaudePromptEvent(json),
+                   date >= earliestRelevantDate {
+                    if date >= fiveHourCutoff {
+                        stats.fiveHourPrompts += 1
+                    }
+                    if date >= startOfDay {
+                        stats.todayPrompts += 1
+                    }
+                }
+
+                guard type == "assistant",
                       let message = json["message"] as? [String: Any] else {
                     return
                 }
@@ -853,83 +962,58 @@ private final class UsageMonitor {
                     ?? (message["id"] as? String)
                     ?? (json["uuid"] as? String)
 
-                guard let requestIdentifier, seenRequestIds.insert(requestIdentifier).inserted,
+                guard let requestIdentifier,
+                      seenRequestIds.insert(requestIdentifier).inserted,
                       let usage = message["usage"] as? [String: Any] else {
                     return
                 }
 
-                let inputTokens = usage["input_tokens"] as? Int ?? 0
-                let outputTokens = usage["output_tokens"] as? Int ?? 0
-                let directTokens = inputTokens + outputTokens
+                let billedTokens = self.integerValue(from: usage["input_tokens"])
+                    + self.integerValue(from: usage["output_tokens"])
+                    + self.integerValue(from: usage["cache_creation_input_tokens"])
+                    + self.integerValue(from: usage["cache_read_input_tokens"])
 
-                totalTokens += directTokens
-                sawUsage = sawUsage || directTokens > 0
+                guard billedTokens > 0 else { return }
+                stats.hasUsageData = true
 
-                guard let timestamp = json["timestamp"] as? String,
-                      let date = self.parseISODate(timestamp) else {
-                    return
+                if date >= fiveHourCutoff {
+                    stats.fiveHourTokens += billedTokens
                 }
-
                 if date >= startOfDay {
-                    todayTokens += directTokens
+                    stats.todayTokens += billedTokens
                 }
             }
         }
 
-        guard sawUsage else {
-            return .unavailable(for: .claude, caption: "Anthropic docs placeholder: ~\(claudePlaceholderPromptLimit) Claude Code prompts per 5h.")
+        guard stats.hasUsageData || stats.fiveHourPrompts > 0 else {
+            return .unavailable(for: .claude, caption: "No recent Claude billing events found in local session logs.")
         }
 
-        let fraction = Double(recentPromptCount) / Double(claudePlaceholderPromptLimit)
+        let valueText = stats.fiveHourTokens > 0
+            ? "\(Self.formatTokenCount(stats.fiveHourTokens)) tok / \(stats.fiveHourPrompts)p"
+            : "\(stats.fiveHourPrompts) prompts"
 
         return ProviderUsageSummary(
             title: CLIBackend.claude.displayName,
-            valueText: "\(recentPromptCount)/\(claudePlaceholderPromptLimit) est",
-            caption: "5h placeholder from Anthropic docs. \(Self.formatTokenCount(todayTokens)) direct tokens today, \(Self.formatTokenCount(totalTokens)) total.",
-            progressState: .determinate(fraction)
+            valueText: valueText,
+            caption: "Last 5h: \(Self.formatTokenCount(stats.fiveHourTokens)) billed tokens across \(stats.fiveHourPrompts) prompts. Today: \(Self.formatTokenCount(stats.todayTokens)) billed tokens across \(stats.todayPrompts) prompts.",
+            progressState: .informational
         )
     }
 
     private func loadCopilotSummary() -> ProviderUsageSummary {
-        let homeURL = fileManager.homeDirectoryForCurrentUser
-        let copilotLogsURL = homeURL
-            .appendingPathComponent("Library/Application Support/Code/User/globalStorage/github.copilot-chat", isDirectory: true)
-
         let hasCLI = CLIBackend.copilot.resolvedPath() != nil
-        let hasLocalLogs = fileManager.fileExists(atPath: copilotLogsURL.path)
-
-        if hasCLI && hasLocalLogs {
-            return ProviderUsageSummary(
-                title: CLIBackend.copilot.displayName,
-                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
-                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
-                progressState: .determinate(0)
-            )
-        }
 
         if hasCLI {
-            return ProviderUsageSummary(
-                title: CLIBackend.copilot.displayName,
-                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
-                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
-                progressState: .determinate(0)
+            return .unavailable(
+                for: .copilot,
+                caption: "GitHub Copilot CLI is installed, but Bobble does not have a reliable local usage source for quota data yet."
             )
         }
 
-        if hasLocalLogs {
-            return ProviderUsageSummary(
-                title: CLIBackend.copilot.displayName,
-                valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
-                caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
-                progressState: .determinate(0)
-            )
-        }
-
-        return ProviderUsageSummary(
-            title: CLIBackend.copilot.displayName,
-            valueText: "\(copilotPlaceholderPremiumRequests)/mo est",
-            caption: "GitHub Copilot Pro placeholder from docs. Local usage is not exposed here.",
-            progressState: .determinate(0)
+        return .unavailable(
+            for: .copilot,
+            caption: "GitHub Copilot CLI is not installed, and no local usage source is available."
         )
     }
 
@@ -964,53 +1048,82 @@ private final class UsageMonitor {
         return String(data: data, encoding: .utf8)
     }
 
-    private func countCodexPrompts(since cutoff: Date) -> Int {
-        let homeURL = fileManager.homeDirectoryForCurrentUser
-        let databaseURL = homeURL.appendingPathComponent(".codex/state_5.sqlite", isDirectory: false)
-        guard fileManager.fileExists(atPath: databaseURL.path) else { return 0 }
-
-        let cutoffTimestamp = Int(cutoff.timeIntervalSince1970)
-        let query = "SELECT rollout_path FROM threads WHERE updated_at >= \(cutoffTimestamp);"
-
-        guard let output = runProcess(
-            executablePath: "/usr/bin/sqlite3",
-            arguments: [databaseURL.path, query]
-        ) else {
+    private func integerValue(from value: Any?) -> Int {
+        switch value {
+        case let int as Int:
+            return int
+        case let number as NSNumber:
+            return number.intValue
+        case let string as String:
+            return Int(string) ?? Int(Double(string) ?? 0)
+        default:
             return 0
         }
+    }
 
-        let paths = output
-            .split(separator: "\n")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    private func intPercent(from value: Any?) -> Int? {
+        switch value {
+        case let int as Int:
+            return max(0, min(int, 100))
+        case let double as Double:
+            return max(0, min(Int(double.rounded()), 100))
+        case let number as NSNumber:
+            return max(0, min(number.intValue, 100))
+        case let string as String:
+            if let int = Int(string) {
+                return max(0, min(int, 100))
+            }
+            if let double = Double(string) {
+                return max(0, min(Int(double.rounded()), 100))
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
 
-        guard !paths.isEmpty else { return 0 }
+    private func isClaudePromptEvent(_ json: [String: Any]) -> Bool {
+        guard (json["isMeta"] as? Bool) != true,
+              let message = json["message"] as? [String: Any],
+              let role = message["role"] as? String,
+              role == "user" else {
+            return false
+        }
 
-        var count = 0
+        guard self.containsMeaningfulClaudeContent(message["content"]) else {
+            return false
+        }
 
-        for path in paths {
-            let fileURL = URL(fileURLWithPath: path, isDirectory: false)
-            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+        return true
+    }
 
-            content.enumerateLines { line, _ in
-                guard let data = line.data(using: .utf8),
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let type = json["type"] as? String,
-                      type == "event_msg",
-                      let timestamp = json["timestamp"] as? String,
-                      let date = self.parseISODate(timestamp),
-                      date >= cutoff,
-                      let payload = json["payload"] as? [String: Any],
-                      let payloadType = payload["type"] as? String,
-                      payloadType == "user_message" else {
-                    return
+    private func containsMeaningfulClaudeContent(_ value: Any?) -> Bool {
+        if let content = value as? String {
+            let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            return !trimmed.contains("<command-name>")
+                && !trimmed.contains("<local-command-caveat>")
+        }
+
+        if let content = value as? [[String: Any]] {
+            for item in content {
+                let type = (item["type"] as? String)?.lowercased()
+                if type == "tool_result" {
+                    continue
                 }
 
-                count += 1
+                if let text = item["text"] as? String,
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return true
+                }
+
+                if type == "image" || type == "document" {
+                    return true
+                }
             }
         }
 
-        return count
+        return false
     }
 
     private static let calendar = Calendar.current

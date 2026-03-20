@@ -40,7 +40,7 @@ struct BobbleRootView: View {
     }
 
     private var headsRenderHeight: CGFloat {
-        headsFrameHeight + (headVisualPadding * 2)
+        headsFrameHeight + headVisualPadding
     }
 
     private var headsRenderWidth: CGFloat {
@@ -51,7 +51,7 @@ struct BobbleRootView: View {
         let base = isExpanded
             ? CGFloat(index) * DesignTokens.deckOffset
             : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
-        return base + headVisualPadding
+        return base
     }
 
     private var headsDragGesture: some Gesture {
@@ -224,37 +224,19 @@ struct BobbleRootView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(DesignTokens.addButtonColor.opacity(0.95))
-                    .overlay(
-                        Circle()
-                            .strokeBorder(DesignTokens.borderColor, lineWidth: 1.2)
-                    )
-                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                    .shadow(
-                        color: .black.opacity(isHovering.wrappedValue ? 0.24 : 0.14),
-                        radius: isHovering.wrappedValue ? 10 : DesignTokens.headShadowRadius,
-                        y: isHovering.wrappedValue ? 2 : DesignTokens.headShadowY
-                    )
-
-                Circle()
-                    .fill(.white.opacity(isHovering.wrappedValue ? 0.34 : 0.26))
-                    .frame(
-                        width: DesignTokens.headDiameter * 0.48,
-                        height: DesignTokens.headDiameter * 0.34
-                    )
-                    .blur(radius: 3)
-                    .offset(x: -9, y: -12)
-
-                Image(systemName: symbolName)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(DesignTokens.textPrimary)
-            }
-            .scaleEffect(isHovering.wrappedValue ? 1.08 : 1.0)
-            .animation(DesignTokens.motionHover, value: isHovering.wrappedValue)
+            Image(systemName: symbolName)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(DesignTokens.textPrimary)
+                .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            ThinLiquidGlassButtonStyle(
+                shape: Circle(),
+                emphasized: true,
+                hoverScale: 1.08,
+                pressedScale: 0.94
+            )
+        )
         .accessibilityLabel(accessibilityLabel)
         .onHover { hovering in
             isHovering.wrappedValue = hovering
@@ -388,10 +370,9 @@ private struct HistorySessionRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(DesignTokens.textSecondary)
                         .frame(width: 28, height: 28)
-                        .background(Circle().fill(DesignTokens.surfaceElevated.opacity(isHovering ? 0.82 : 0.58)))
                         .opacity(isHovering ? 1 : 0.72)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), hoverScale: 1.04, pressedScale: 0.94))
                 .padding(.top, 2)
             }
         }

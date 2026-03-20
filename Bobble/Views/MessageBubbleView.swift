@@ -263,21 +263,17 @@ struct AttachmentChipView: View {
             if removable, let onRemove {
                 Button(action: onRemove) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignTokens.textSecondary.opacity(0.9))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(DesignTokens.textPrimary)
+                        .frame(width: 18, height: 18)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), pressedScale: 0.9))
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
-            Capsule()
-                .fill(DesignTokens.surfaceColor.opacity(0.8))
-        )
-        .overlay(
-            Capsule()
-                .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+            ThinLiquidGlassBackground(shape: Capsule())
         )
 
         if removable {
@@ -330,11 +326,12 @@ private struct RemovableImageAttachmentChipView: View {
 
             if let onRemove {
                 Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white, Color.black.opacity(0.65))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(DesignTokens.textPrimary)
+                        .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), emphasized: true, pressedScale: 0.9))
                 .offset(x: 4, y: -4)
             }
         }
@@ -371,10 +368,9 @@ private struct ImageAttachmentPreviewView: View {
                         Image(systemName: "arrow.up.forward.app")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(DesignTokens.textPrimary)
-                            .padding(6)
-                            .background(.thinMaterial, in: Circle())
+                            .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), emphasized: true, pressedScale: 0.9))
                     .padding(8)
                 }
                 .contentShape(RoundedRectangle(cornerRadius: 10))
