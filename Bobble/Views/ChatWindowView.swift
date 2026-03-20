@@ -135,14 +135,6 @@ struct HoverScaleButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(DesignTokens.textPrimary)
-            .frame(width: 30, height: 30)
-            .background(
-                ThinLiquidGlassBackground(
-                    shape: Circle(),
-                    isActive: isHovering || configuration.isPressed
-                )
-            )
             .scaleEffect(configuration.isPressed ? 0.92 : (isHovering ? 1.06 : 1.0))
             .animation(DesignTokens.motionPress, value: configuration.isPressed)
             .animation(DesignTokens.motionHover, value: isHovering)

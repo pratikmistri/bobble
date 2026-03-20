@@ -245,21 +245,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func collapseSession() {
-        guard let expandedSessionId = manager.expandedSessionId, !isCollapsingSession else { return }
+        guard manager.expandedSessionId != nil, !isCollapsingSession else { return }
         stopPhysics()
         isCollapsingSession = true
 
         let size = positionManager.collapsedPanelSize(count: max(manager.sessions.count, 1))
-
-        // Keep the closing view alive long enough to animate it in place instead of
-        // morphing the panel background into the returning head.
         withAnimation(DesignTokens.motionLayout) {
-            manager.closingSessionId = expandedSessionId
             manager.expandedSessionId = nil
         }
         animatePanelFrame(to: size, duration: 0.34, mode: .verticalCollapse) { [weak self] in
             guard let self else { return }
-            self.manager.closingSessionId = nil
             self.isCollapsingSession = false
         }
     }
@@ -352,25 +347,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mode: PanelAnimationMode = .fullFrame,
         completion: (() -> Void)? = nil
     ) {
-        let targetDockSide = preferredDockSideForCurrentFrame()
-        let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: targetDockSide)
-        let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor, dockSide: targetDockSide)
-        let finalFrame = NSRect(origin: finalOrigin, size: size)
         let animatedFrame: NSRect
+        let finalFrame: NSRect
+        let finalDockSide: PanelDockSide
+        let finalAnchor: NSPoint
 
         switch mode {
         case .fullFrame:
-            panelAnchor = resolvedAnchor
-            manager.panelDockSide = targetDockSide
+            let targetDockSide = preferredDockSideForCurrentFrame()
+            let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: targetDockSide)
+            let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor, dockSide: targetDockSide)
+            finalFrame = NSRect(origin: finalOrigin, size: size)
+            finalDockSide = targetDockSide
+            finalAnchor = resolvedAnchor
+
+            panelAnchor = finalAnchor
+            manager.panelDockSide = finalDockSide
             animatedFrame = finalFrame
+
         case .verticalCollapse:
+            // Keep controls visually locked in place while collapsing:
+            // preserve the current bottom edge and current dock edge, and avoid
+            // re-solving/clamping origin during this transition.
+            finalDockSide = manager.panelDockSide
             let currentFrame = mainPanel.frame
-            animatedFrame = NSRect(
-                x: currentFrame.origin.x,
-                y: currentFrame.origin.y,
-                width: currentFrame.size.width,
-                height: size.height
+            let finalOriginX: CGFloat
+            switch finalDockSide {
+            case .leading:
+                finalOriginX = currentFrame.minX
+            case .trailing:
+                finalOriginX = currentFrame.maxX - size.width
+            }
+            let finalOrigin = NSPoint(x: finalOriginX, y: currentFrame.minY)
+            finalFrame = NSRect(origin: finalOrigin, size: size)
+            finalAnchor = positionManager.panelAnchor(
+                for: finalOrigin,
+                size: size,
+                dockSide: finalDockSide
             )
+            animatedFrame = finalFrame
         }
 
         NSAnimationContext.runAnimationGroup { context in
@@ -381,11 +396,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 display: true
             )
         } completionHandler: {
-            if mode != .fullFrame {
-                self.panelAnchor = resolvedAnchor
-                self.manager.panelDockSide = targetDockSide
-                self.mainPanel.setFrame(finalFrame, display: true)
-            }
+            self.panelAnchor = finalAnchor
+            self.manager.panelDockSide = finalDockSide
+            self.mainPanel.setFrame(finalFrame, display: true)
             completion?()
         }
     }

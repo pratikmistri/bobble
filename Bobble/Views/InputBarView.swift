@@ -54,19 +54,17 @@ struct InputBarView: View {
                     Button(action: selectAttachments) {
                         Image(systemName: "paperclip")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(DesignTokens.textPrimary)
-                            .frame(width: 32, height: 32)
+                            .foregroundColor(DesignTokens.textSecondary)
                     }
-                    .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), pressedScale: 0.92))
+                    .buttonStyle(.plain)
                     .help("Attach files")
 
                     Button(action: viewModel.captureScreenshot) {
                         Image(systemName: viewModel.isCapturingScreenshot ? "hourglass" : "viewfinder")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(DesignTokens.textPrimary)
-                            .frame(width: 32, height: 32)
+                            .foregroundColor(DesignTokens.textSecondary)
                     }
-                    .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), pressedScale: 0.92))
+                    .buttonStyle(.plain)
                     .disabled(viewModel.isCapturingScreenshot)
                     .help("Capture screenshot")
 
@@ -86,31 +84,21 @@ struct InputBarView: View {
                     Button(action: startDictation) {
                         Image(systemName: "mic.fill")
                             .font(.system(size: 16))
-                            .foregroundColor(DesignTokens.textPrimary)
-                            .frame(width: 32, height: 32)
+                            .foregroundColor(DesignTokens.textSecondary)
                     }
-                    .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), pressedScale: 0.92))
+                    .buttonStyle(.plain)
                     .help("Start Dictation")
 
                     Button(action: { triggerSend() }) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 24))
                             .foregroundColor(canSend ? DesignTokens.textPrimary : DesignTokens.textSecondary)
-                            .frame(width: 36, height: 36)
                             .scaleEffect(sendBounce ? 0.9 : 1.0)
                             .rotationEffect(.degrees(sendBounce ? -10 : 0))
                             .animation(DesignTokens.motionPlayful, value: sendBounce)
                     }
-                    .buttonStyle(
-                        ThinLiquidGlassButtonStyle(
-                            shape: Circle(),
-                            emphasized: canSend,
-                            hoverScale: 1.05,
-                            pressedScale: 0.9
-                        )
-                    )
+                    .buttonStyle(.plain)
                     .disabled(!canSend)
-                    .opacity(canSend ? 1 : 0.72)
                     .animation(DesignTokens.motionFade, value: canSend)
                 }
             }
@@ -220,7 +208,12 @@ struct ModelPickerMenu: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
-                ThinLiquidGlassBackground(shape: Capsule(), emphasized: true)
+                Capsule()
+                    .fill(DesignTokens.surfaceAccent.opacity(0.32))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
             )
         }
         .menuStyle(.borderlessButton)

@@ -20,18 +20,37 @@ struct ChatHeadView: View {
     var body: some View {
         ZStack {
             // Main circle — participates in matchedGeometryEffect morph
-            ThinLiquidGlassBackground(
-                shape: Circle(),
-                emphasized: true,
-                isActive: isHovering || isDropTargeted
-            )
-                .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
-                .matchedGeometryEffect(
-                    id: session.id,
-                    in: morphNamespace,
-                    properties: .frame,
-                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
-                )
+            if #available(macOS 26.0, *) {
+                Circle()
+                    .fill(.clear)
+                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .matchedGeometryEffect(
+                        id: session.id,
+                        in: morphNamespace,
+                        properties: .frame,
+                        anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
+                    )
+            } else {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.white.opacity((isHovering || isDropTargeted) ? 0.58 : 0.44), lineWidth: 1)
+                    )
+                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                    .matchedGeometryEffect(
+                        id: session.id,
+                        in: morphNamespace,
+                        properties: .frame,
+                        anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
+                    )
+                    .shadow(
+                        color: .black.opacity((isHovering || isDropTargeted) ? 0.22 : 0.12),
+                        radius: (isHovering || isDropTargeted) ? 9 : DesignTokens.headShadowRadius,
+                        y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
+                    )
+            }
 
             // Model-chosen chat marker
             Text(session.displayChatHeadSymbol)

@@ -12,8 +12,6 @@ struct BobbleRootView: View {
     let onHeadsDragEnded: () -> Void
 
     @Namespace private var morphNamespace
-    @State private var isHoveringAdd = false
-    @State private var isHoveringHistory = false
     @State private var isShowingHistory = false
 
     private let chatWidth: CGFloat = 320
@@ -21,6 +19,7 @@ struct BobbleRootView: View {
     private let previewOverflow: CGFloat = DesignTokens.headPreviewOverflow
 
     private var isExpanded: Bool { manager.expandedSessionId != nil }
+    private var isHeadsDeckMode: Bool { isExpanded }
     private var headVisualPadding: CGFloat { DesignTokens.headVisualPadding }
     private var dockSide: PanelDockSide { manager.panelDockSide }
 
@@ -28,10 +27,15 @@ struct BobbleRootView: View {
         manager.sessions.filter { $0.id != manager.expandedSessionId }
     }
 
+    private var headsSlotCount: Int {
+        let virtualExpandedSlot = isHeadsDeckMode && !manager.sessions.isEmpty ? 1 : 0
+        return visibleSessions.count + virtualExpandedSlot
+    }
+
     private var headsFrameHeight: CGFloat {
-        let count = visibleSessions.count
+        let count = headsSlotCount
         guard count > 0 else { return 0 }
-        if isExpanded {
+        if isHeadsDeckMode {
             return DesignTokens.headDiameter + CGFloat(count - 1) * DesignTokens.deckOffset
         } else {
             return CGFloat(count) * DesignTokens.headDiameter
@@ -39,16 +43,39 @@ struct BobbleRootView: View {
         }
     }
 
+    private var collapsedHeadsRenderHeight: CGFloat {
+        let count = manager.sessions.count
+        guard count > 0 else { return 0 }
+        let collapsedFrameHeight = CGFloat(count) * DesignTokens.headDiameter
+            + CGFloat(count - 1) * DesignTokens.headSpacing
+        return collapsedFrameHeight + headVisualPadding
+    }
+
     private var headsRenderHeight: CGFloat {
-        headsFrameHeight + headVisualPadding
+        let currentRenderHeight = headsFrameHeight + headVisualPadding
+        if isHeadsDeckMode {
+            return max(currentRenderHeight, collapsedHeadsRenderHeight)
+        }
+        return currentRenderHeight
     }
 
     private var headsRenderWidth: CGFloat {
         DesignTokens.headDiameter + (headVisualPadding * 2)
     }
 
+    private var controlsSectionHeight: CGFloat {
+        let controlsHeight = (DesignTokens.headDiameter * 2) + DesignTokens.headSpacing
+        let headsHeight = headsSlotCount == 0 ? 0 : (DesignTokens.headSpacing + headsRenderHeight)
+        return controlsHeight + headsHeight + (DesignTokens.headInset * 2)
+    }
+
+    private var headsLayoutAnimation: Animation? {
+        let isTransitioning = manager.deletingSessionId != nil
+        return isTransitioning ? nil : DesignTokens.motionLayout
+    }
+
     private func headYOffset(for index: Int) -> CGFloat {
-        let base = isExpanded
+        let base = isHeadsDeckMode
             ? CGFloat(index) * DesignTokens.deckOffset
             : CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
         return base
@@ -65,11 +92,10 @@ struct BobbleRootView: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if let sessionId = manager.expandedSessionId ?? manager.closingSessionId,
+        ZStack(alignment: dockSide == .trailing ? .bottomTrailing : .bottomLeading) {
+            if let sessionId = manager.expandedSessionId,
                let session = manager.sessions.first(where: { $0.id == sessionId }),
                let viewModel = manager.viewModel(for: sessionId) {
-                let isClosingWindow = manager.closingSessionId == sessionId && manager.expandedSessionId == nil
                 let isDeletingExpandedSession = manager.deletingSessionId == sessionId
 
                 HStack(spacing: 0) {
@@ -79,27 +105,18 @@ struct BobbleRootView: View {
                     }
 
                     ZStack {
-                        if isClosingWindow {
-                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                                .fill(DesignTokens.surfaceColor)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                                        .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
-                                )
-                        } else {
-                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                                .fill(DesignTokens.surfaceColor)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
-                                        .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
-                                )
-                                .matchedGeometryEffect(
-                                    id: session.id,
-                                    in: morphNamespace,
-                                    properties: .frame,
-                                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
-                                )
-                        }
+                        RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                            .fill(DesignTokens.surfaceColor)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                                    .stroke(DesignTokens.borderColor.opacity(0.8), lineWidth: 1)
+                            )
+                            .matchedGeometryEffect(
+                                id: session.id,
+                                in: morphNamespace,
+                                properties: .frame,
+                                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
+                            )
 
                         ChatContentView(
                             session: session,
@@ -121,13 +138,12 @@ struct BobbleRootView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .frame(height: (isDeletingExpandedSession || isClosingWindow) ? 0 : chatHeight, alignment: .top)
+                .frame(height: isDeletingExpandedSession ? 0 : chatHeight, alignment: .top)
                 .clipped()
-                .opacity((isDeletingExpandedSession || isClosingWindow) ? 0 : 1)
+                .opacity(isDeletingExpandedSession ? 0 : 1)
                 .animation(DesignTokens.motionLayout, value: isDeletingExpandedSession)
                 .animation(DesignTokens.motionFade, value: isDeletingExpandedSession)
-                .animation(DesignTokens.motionLayout, value: isClosingWindow)
-                .animation(DesignTokens.motionFade, value: isClosingWindow)
+                .padding(.bottom, controlsSectionHeight + 8)
             }
 
             HStack(spacing: 0) {
@@ -140,7 +156,7 @@ struct BobbleRootView: View {
                     addButton
                     historyButton
 
-                    if !visibleSessions.isEmpty {
+                    if headsSlotCount > 0 {
                         ZStack(alignment: .top) {
                             ForEach(Array(visibleSessions.enumerated()), id: \.element.id) { index, session in
                                 ChatHeadView(
@@ -160,10 +176,18 @@ struct BobbleRootView: View {
                                 .offset(y: headYOffset(for: index))
                                 .zIndex(Double(visibleSessions.count - index))
                             }
+
+                            if isHeadsDeckMode {
+                                Color.clear
+                                    .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                                    .allowsHitTesting(false)
+                                    .offset(y: headYOffset(for: visibleSessions.count))
+                                    .zIndex(0)
+                            }
                         }
                         .frame(width: headsRenderWidth, height: headsRenderHeight, alignment: .top)
-                        .animation(DesignTokens.motionLayout, value: isExpanded)
-                        .animation(DesignTokens.motionLayout, value: visibleSessions.count)
+                        .animation(headsLayoutAnimation, value: isExpanded)
+                        .animation(headsLayoutAnimation, value: headsSlotCount)
                     }
                 }
                 .padding(DesignTokens.headInset)
@@ -188,7 +212,6 @@ struct BobbleRootView: View {
     private var addButton: some View {
         floatingActionButton(
             symbolName: "plus",
-            isHovering: $isHoveringAdd,
             accessibilityLabel: "New chat",
             action: onAddSession
         )
@@ -197,7 +220,6 @@ struct BobbleRootView: View {
     private var historyButton: some View {
         floatingActionButton(
             symbolName: "clock.arrow.circlepath",
-            isHovering: $isHoveringHistory,
             accessibilityLabel: "Chat history"
         ) {
             isShowingHistory.toggle()
@@ -219,28 +241,39 @@ struct BobbleRootView: View {
 
     private func floatingActionButton(
         symbolName: String,
-        isHovering: Binding<Bool>,
         accessibilityLabel: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbolName)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+        Group {
+            if #available(macOS 26.0, *) {
+                Button(action: action) {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(DesignTokens.textPrimary)
+                        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                }
+                .buttonStyle(.glass(.regular.interactive()))
+                .buttonBorderShape(.circle)
+            } else {
+                Button(action: action) {
+                    ZStack {
+                        Circle()
+                            .fill(DesignTokens.addButtonColor.opacity(0.95))
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(DesignTokens.borderColor, lineWidth: 1.2)
+                            )
+                            .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+
+                        Image(systemName: symbolName)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(DesignTokens.textPrimary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(
-            ThinLiquidGlassButtonStyle(
-                shape: Circle(),
-                emphasized: true,
-                hoverScale: 1.08,
-                pressedScale: 0.94
-            )
-        )
         .accessibilityLabel(accessibilityLabel)
-        .onHover { hovering in
-            isHovering.wrappedValue = hovering
-        }
     }
 }
 
@@ -370,9 +403,10 @@ private struct HistorySessionRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(DesignTokens.textSecondary)
                         .frame(width: 28, height: 28)
+                        .background(Circle().fill(DesignTokens.surfaceElevated.opacity(isHovering ? 0.82 : 0.58)))
                         .opacity(isHovering ? 1 : 0.72)
                 }
-                .buttonStyle(ThinLiquidGlassButtonStyle(shape: Circle(), hoverScale: 1.04, pressedScale: 0.94))
+                .buttonStyle(.plain)
                 .padding(.top, 2)
             }
         }

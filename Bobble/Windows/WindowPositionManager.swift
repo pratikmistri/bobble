@@ -37,17 +37,19 @@ struct WindowPositionManager {
     // MARK: - Expanded state (deck of heads + chat window)
 
     func expandedPanelSize(headsCount: Int) -> NSSize {
-        let nonExpanded = headsCount - 1
+        let stackCount = max(headsCount, 0)
         let inset = DesignTokens.headInset * 2
 
         let addH = headDiameter
         let historyH = headDiameter
-        let deckH = nonExpanded > 0
-            ? headDiameter + CGFloat(nonExpanded - 1) * DesignTokens.deckOffset + headVisualPadding
+        let stackH = stackCount > 0
+            ? (CGFloat(stackCount) * headDiameter)
+                + (CGFloat(stackCount - 1) * headSpacing)
+                + headVisualPadding
             : 0
-        let headsGap = nonExpanded > 0 ? headSpacing : 0
+        let headsGap = stackCount > 0 ? headSpacing : 0
         let controlsGap = headSpacing
-        let headsSection = inset + addH + controlsGap + historyH + headsGap + deckH
+        let headsSection = inset + addH + controlsGap + historyH + headsGap + stackH
 
         let totalH = headsSection + vStackSpacing + chatHeight
         return NSSize(
