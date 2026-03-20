@@ -368,12 +368,6 @@ private struct HistorySessionRow: View {
                                 .lineLimit(1)
                         }
 
-                        HStack(spacing: 6) {
-                            ProviderBadgeView(provider: session.provider, compact: true)
-
-                            HistoryStateBadge(isArchived: entry.isArchived)
-                        }
-
                         Text(session.historyPreview)
                             .font(.system(size: 11))
                             .foregroundStyle(DesignTokens.textSecondary)
@@ -405,22 +399,6 @@ private struct HistorySessionRow: View {
         .onHover { hovering in
             isHovering = hovering
         }
-    }
-}
-
-private struct HistoryStateBadge: View {
-    let isArchived: Bool
-
-    var body: some View {
-        Text(isArchived ? "Archived" : "Live")
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(DesignTokens.textSecondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(DesignTokens.surfaceElevated.opacity(0.7))
-            )
     }
 }
 
