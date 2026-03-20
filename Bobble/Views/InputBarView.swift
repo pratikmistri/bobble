@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
-
 struct InputBarView: View {
     @ObservedObject var viewModel: ChatSessionViewModel
     let showProviderBadge: Bool
@@ -165,99 +163,11 @@ struct InputBarView: View {
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        var handled = false
-
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                handled = true
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                    guard let url = extractFileURL(from: item) else {
-                        return
-                    }
-                    DispatchQueue.main.async {
-                        viewModel.attachFiles(urls: [url])
-                    }
-                }
-                continue
-            }
-
-            guard let imageTypeIdentifier = preferredImageType(for: provider) else {
-                continue
-            }
-
-            handled = true
-            provider.loadDataRepresentation(forTypeIdentifier: imageTypeIdentifier) { data, _ in
-                guard let data else { return }
-                DispatchQueue.main.async {
-                    viewModel.attachImageData(data, suggestedName: provider.suggestedName)
-                }
-            }
-        }
-
-        return handled
-    }
-
-    private func preferredImageType(for provider: NSItemProvider) -> String? {
-        let candidates = [
-            UTType.png.identifier,
-            UTType.jpeg.identifier,
-            UTType.tiff.identifier,
-            UTType.gif.identifier,
-            UTType.image.identifier
-        ]
-        return candidates.first(where: provider.hasItemConformingToTypeIdentifier)
-    }
-
-    private func extractFileURL(from item: NSSecureCoding?) -> URL? {
-        if let url = item as? URL, url.isFileURL {
-            return url
-        }
-
-        if let url = item as? NSURL, let bridgedURL = url as URL?, bridgedURL.isFileURL {
-            return bridgedURL
-        }
-
-        if let data = item as? Data {
-            return decodeFileURL(from: data)
-        }
-
-        if let string = item as? String, let url = URL(string: string), url.isFileURL {
-            return url
-        }
-
-        return nil
-    }
-
-    private func decodeFileURL(from data: Data) -> URL? {
-        if let url = URL(dataRepresentation: data, relativeTo: nil), url.isFileURL {
-            return url
-        }
-
-        let candidateStrings = [
-            String(data: data, encoding: .utf8),
-            String(data: data, encoding: .utf16LittleEndian),
-            String(data: data, encoding: .utf16BigEndian)
-        ]
-
-        for candidate in candidateStrings.compactMap({ $0 }) {
-            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let url = URL(string: trimmed), url.isFileURL {
-                return url
-            }
-        }
-
-        return nil
+        viewModel.attachDroppedItems(from: providers)
     }
 
     private var supportedDropTypes: [String] {
-        [
-            UTType.fileURL.identifier,
-            UTType.png.identifier,
-            UTType.jpeg.identifier,
-            UTType.tiff.identifier,
-            UTType.gif.identifier,
-            UTType.image.identifier
-        ]
+        ChatSessionViewModel.supportedDropTypeIdentifiers
     }
 }
 

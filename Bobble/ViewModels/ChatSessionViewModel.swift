@@ -5,6 +5,15 @@ import Foundation
 import UniformTypeIdentifiers
 
 class ChatSessionViewModel: ObservableObject {
+    static let supportedDropTypeIdentifiers: [String] = [
+        UTType.fileURL.identifier,
+        UTType.png.identifier,
+        UTType.jpeg.identifier,
+        UTType.tiff.identifier,
+        UTType.gif.identifier,
+        UTType.image.identifier
+    ]
+
     @Published var session: ChatSession
     @Published var inputText: String = ""
     @Published var pendingAttachments: [ChatAttachment] = []
@@ -201,6 +210,39 @@ class ChatSessionViewModel: ObservableObject {
         } catch {
             appendAttachmentError("Couldn't attach dropped image: \(error.localizedDescription)")
         }
+    }
+
+    func attachDroppedItems(from providers: [NSItemProvider]) -> Bool {
+        var handled = false
+
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                handled = true
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] item, _ in
+                    guard let self, let url = self.extractFileURL(from: item) else {
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        self.attachFiles(urls: [url])
+                    }
+                }
+                continue
+            }
+
+            guard let imageTypeIdentifier = preferredImageType(for: provider) else {
+                continue
+            }
+
+            handled = true
+            provider.loadDataRepresentation(forTypeIdentifier: imageTypeIdentifier) { [weak self] data, _ in
+                guard let self, let data else { return }
+                DispatchQueue.main.async {
+                    self.attachImageData(data, suggestedName: provider.suggestedName)
+                }
+            }
+        }
+
+        return handled
     }
 
     func removePendingAttachment(id: UUID) {
@@ -571,5 +613,57 @@ class ChatSessionViewModel: ObservableObject {
             return nil
         }
         return bitmap.representation(using: .png, properties: [:])
+    }
+
+    private func preferredImageType(for provider: NSItemProvider) -> String? {
+        let candidates = [
+            UTType.png.identifier,
+            UTType.jpeg.identifier,
+            UTType.tiff.identifier,
+            UTType.gif.identifier,
+            UTType.image.identifier
+        ]
+        return candidates.first(where: provider.hasItemConformingToTypeIdentifier)
+    }
+
+    private func extractFileURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL, url.isFileURL {
+            return url
+        }
+
+        if let url = item as? NSURL, let bridgedURL = url as URL?, bridgedURL.isFileURL {
+            return bridgedURL
+        }
+
+        if let data = item as? Data {
+            return decodeFileURL(from: data)
+        }
+
+        if let string = item as? String, let url = URL(string: string), url.isFileURL {
+            return url
+        }
+
+        return nil
+    }
+
+    private func decodeFileURL(from data: Data) -> URL? {
+        if let url = URL(dataRepresentation: data, relativeTo: nil), url.isFileURL {
+            return url
+        }
+
+        let candidateStrings = [
+            String(data: data, encoding: .utf8),
+            String(data: data, encoding: .utf16LittleEndian),
+            String(data: data, encoding: .utf16BigEndian)
+        ]
+
+        for candidate in candidateStrings.compactMap({ $0 }) {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let url = URL(string: trimmed), url.isFileURL {
+                return url
+            }
+        }
+
+        return nil
     }
 }

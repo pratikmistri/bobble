@@ -16,6 +16,7 @@ struct ChatHeadStackView: View {
                     isExpanded: manager.expandedSessionId == session.id,
                     dockSide: manager.panelDockSide,
                     onTap: { onHeadTapped(session) },
+                    onDropAttachments: { _ in false },
                     morphNamespace: morphNamespace
                 )
             }

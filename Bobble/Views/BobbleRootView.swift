@@ -149,6 +149,12 @@ struct BobbleRootView: View {
                                     isExpanded: false,
                                     dockSide: dockSide,
                                     onTap: { onHeadTapped(session) },
+                                    onDropAttachments: { providers in
+                                        guard let viewModel = manager.viewModel(for: session.id) else {
+                                            return false
+                                        }
+                                        return viewModel.attachDroppedItems(from: providers)
+                                    },
                                     morphNamespace: morphNamespace
                                 )
                                 .offset(y: headYOffset(for: index))

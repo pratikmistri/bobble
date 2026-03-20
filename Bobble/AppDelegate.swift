@@ -597,17 +597,21 @@ private enum UsageProgressState {
 }
 
 private final class UsageMenuRowView: NSView {
+    private static let rowSize = NSSize(width: 264, height: 72)
+    private static let horizontalInset: CGFloat = 16
+    private static let verticalInset: CGFloat = 8
+
     private let titleLabel = NSTextField(labelWithString: "")
     private let valueLabel = NSTextField(labelWithString: "")
     private let captionLabel = NSTextField(labelWithString: "")
     private let progressIndicator = NSProgressIndicator()
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 264, height: 72)
+        Self.rowSize
     }
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 264, height: 72))
+        super.init(frame: NSRect(origin: .zero, size: Self.rowSize))
 
         titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         titleLabel.textColor = .labelColor
@@ -648,10 +652,10 @@ private final class UsageMenuRowView: NSView {
         addSubview(contentStack)
 
         NSLayoutConstraint.activate([
-            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            contentStack.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
+            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
+            contentStack.topAnchor.constraint(equalTo: topAnchor, constant: Self.verticalInset),
+            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.verticalInset),
 
             headerStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             progressIndicator.widthAnchor.constraint(equalTo: contentStack.widthAnchor),

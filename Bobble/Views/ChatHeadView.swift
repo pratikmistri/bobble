@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ChatHeadView: View {
     let session: ChatSession
@@ -6,9 +8,11 @@ struct ChatHeadView: View {
     let isExpanded: Bool
     let dockSide: PanelDockSide
     let onTap: () -> Void
+    let onDropAttachments: ([NSItemProvider]) -> Bool
     var morphNamespace: Namespace.ID
 
     @State private var isHovering = false
+    @State private var isDropTargeted = false
     @State private var isShowingPreview = false
     @State private var statusBlink = false
     @State private var previewTask: Task<Void, Never>?
@@ -30,9 +34,9 @@ struct ChatHeadView: View {
                     anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading
                 )
                 .shadow(
-                    color: .black.opacity(isHovering ? 0.26 : 0.16),
-                    radius: isHovering ? 10 : DesignTokens.headShadowRadius,
-                    y: isHovering ? 2 : DesignTokens.headShadowY
+                    color: .black.opacity((isHovering || isDropTargeted) ? 0.26 : 0.16),
+                    radius: (isHovering || isDropTargeted) ? 10 : DesignTokens.headShadowRadius,
+                    y: (isHovering || isDropTargeted) ? 2 : DesignTokens.headShadowY
                 )
 
             Circle()
@@ -63,6 +67,14 @@ struct ChatHeadView: View {
                 )
                 .scaleEffect(isExpanded ? 1 : 0.8)
 
+            Circle()
+                .stroke(DesignTokens.surfaceAccent.opacity(isDropTargeted ? 0.95 : 0), lineWidth: 2)
+                .frame(
+                    width: DesignTokens.headDiameter + 10,
+                    height: DesignTokens.headDiameter + 10
+                )
+                .scaleEffect(isDropTargeted ? 1 : 0.92)
+
             // Single top-right status indicator.
             if let status = statusIndicator {
                 statusIndicatorView(for: status)
@@ -71,9 +83,10 @@ struct ChatHeadView: View {
             }
         }
         // Hover: lift + scale
-        .scaleEffect(isHovering ? 1.04 : 1.0)
-        .zIndex(isHovering || isShowingPreview ? 1000 : 0)
+        .scaleEffect((isHovering || isDropTargeted) ? 1.04 : 1.0)
+        .zIndex(isHovering || isDropTargeted || isShowingPreview ? 1000 : 0)
         .animation(DesignTokens.motionHover, value: isHovering)
+        .animation(DesignTokens.motionHover, value: isDropTargeted)
         .animation(DesignTokens.motionLayout, value: isExpanded)
         .animation(DesignTokens.motionEntrance, value: isShowingPreview)
         .overlay(alignment: dockSide == .trailing ? .leading : .trailing) {
@@ -105,6 +118,14 @@ struct ChatHeadView: View {
         .onTapGesture {
             dismissPreview()
             onTap()
+        }
+        .background {
+            ChatHeadDropDestinationView(
+                onHoverChanged: { hovering in
+                    isDropTargeted = hovering
+                },
+                onPerformDrop: handleDrop
+            )
         }
         .onDisappear {
             dismissPreview()
@@ -218,6 +239,15 @@ struct ChatHeadView: View {
         }
     }
 
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        let handled = onDropAttachments(providers)
+        guard handled else { return false }
+
+        dismissPreview()
+        onTap()
+        return true
+    }
+
     @ViewBuilder
     private func statusIndicatorView(for status: HeadStatus) -> some View {
         switch status {
@@ -257,6 +287,118 @@ struct ChatHeadView: View {
         withTransaction(transaction) {
             statusBlink = false
         }
+    }
+}
+
+private struct ChatHeadDropDestinationView: NSViewRepresentable {
+    let onHoverChanged: (Bool) -> Void
+    let onPerformDrop: ([NSItemProvider]) -> Bool
+
+    func makeNSView(context: Context) -> ChatHeadDropNSView {
+        let view = ChatHeadDropNSView()
+        view.onHoverChanged = onHoverChanged
+        view.onPerformDrop = onPerformDrop
+        return view
+    }
+
+    func updateNSView(_ nsView: ChatHeadDropNSView, context: Context) {
+        nsView.onHoverChanged = onHoverChanged
+        nsView.onPerformDrop = onPerformDrop
+    }
+}
+
+private final class ChatHeadDropNSView: NSView {
+    var onHoverChanged: (Bool) -> Void = { _ in }
+    var onPerformDrop: ([NSItemProvider]) -> Bool = { _ in false }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        registerForDraggedTypes(Self.supportedPasteboardTypes)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes(Self.supportedPasteboardTypes)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let providers = Self.providers(from: sender.draggingPasteboard)
+        guard !providers.isEmpty else { return [] }
+        onHoverChanged(true)
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let providers = Self.providers(from: sender.draggingPasteboard)
+        guard !providers.isEmpty else {
+            onHoverChanged(false)
+            return []
+        }
+        onHoverChanged(true)
+        return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        onHoverChanged(false)
+    }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        !Self.providers(from: sender.draggingPasteboard).isEmpty
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let providers = Self.providers(from: sender.draggingPasteboard)
+        onHoverChanged(false)
+        guard !providers.isEmpty else { return false }
+        return onPerformDrop(providers)
+    }
+
+    override func concludeDragOperation(_ sender: NSDraggingInfo?) {
+        onHoverChanged(false)
+    }
+
+    private static var supportedPasteboardTypes: [NSPasteboard.PasteboardType] {
+        [
+            .fileURL,
+            NSPasteboard.PasteboardType(UTType.png.identifier),
+            NSPasteboard.PasteboardType(UTType.jpeg.identifier),
+            NSPasteboard.PasteboardType(UTType.tiff.identifier),
+            NSPasteboard.PasteboardType(UTType.gif.identifier)
+        ]
+    }
+
+    private static func providers(from pasteboard: NSPasteboard) -> [NSItemProvider] {
+        var providers: [NSItemProvider] = []
+
+        if let urls = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL] {
+            providers.append(contentsOf: urls.map { url in
+                let provider = NSItemProvider(object: url as NSURL)
+                provider.suggestedName = url.deletingPathExtension().lastPathComponent
+                return provider
+            })
+        }
+
+        guard let items = pasteboard.pasteboardItems else {
+            return providers
+        }
+
+        for item in items {
+            for type in supportedPasteboardTypes where type != .fileURL {
+                guard let data = item.data(forType: type) else { continue }
+                let provider = NSItemProvider()
+                provider.registerDataRepresentation(forTypeIdentifier: type.rawValue, visibility: .all) { completion in
+                    completion(data, nil)
+                    return nil
+                }
+                providers.append(provider)
+                break
+            }
+        }
+
+        return providers
     }
 }
 
