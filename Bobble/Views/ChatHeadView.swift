@@ -16,6 +16,7 @@ struct ChatHeadView: View {
     @State private var isShowingPreview = false
     @State private var statusBlink = false
     @State private var previewTask: Task<Void, Never>?
+    private let controlShellDiameter: CGFloat = DesignTokens.headDiameter + 8
 
     var body: some View {
         let isHighlighted = isHovering || isDropTargeted
@@ -26,10 +27,10 @@ struct ChatHeadView: View {
                 if #available(macOS 26.0, *) {
                     Circle()
                         .fill(.clear)
-                        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                        .frame(width: controlShellDiameter, height: controlShellDiameter)
                         .glassEffect(.regular.interactive(), in: Circle())
                 } else {
-                    FloatingControlCircle(isHighlighted: isHighlighted) {
+                    FloatingControlCircle(isHighlighted: isHighlighted, diameter: controlShellDiameter) {
                         EmptyView()
                     }
                 }
@@ -50,20 +51,20 @@ struct ChatHeadView: View {
             Circle()
                 .stroke(DesignTokens.textSecondary.opacity(isExpanded ? 0.9 : 0), lineWidth: 3)
                 .frame(
-                    width: DesignTokens.headDiameter + (isExpanded ? 6 : 0),
-                    height: DesignTokens.headDiameter + (isExpanded ? 6 : 0)
+                    width: controlShellDiameter + (isExpanded ? 6 : 0),
+                    height: controlShellDiameter + (isExpanded ? 6 : 0)
                 )
                 .scaleEffect(isExpanded ? 1 : 0.8)
 
             Circle()
                 .stroke(DesignTokens.surfaceAccent.opacity(isDropTargeted ? 0.95 : 0), lineWidth: 2)
                 .frame(
-                    width: DesignTokens.headDiameter + 10,
-                    height: DesignTokens.headDiameter + 10
+                    width: controlShellDiameter + 10,
+                    height: controlShellDiameter + 10
                 )
                 .scaleEffect(isDropTargeted ? 1 : 0.92)
         }
-        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+        .frame(width: controlShellDiameter, height: controlShellDiameter)
         // Hover: lift + scale
         .scaleEffect(isHighlighted ? 1.04 : 1.0)
         .zIndex(isHovering || isDropTargeted || isShowingPreview ? 1000 : 0)

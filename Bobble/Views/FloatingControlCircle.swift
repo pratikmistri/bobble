@@ -2,13 +2,16 @@ import SwiftUI
 
 struct FloatingControlCircle<Content: View>: View {
     let isHighlighted: Bool
+    let diameter: CGFloat
     let content: Content
 
     init(
         isHighlighted: Bool = false,
+        diameter: CGFloat = DesignTokens.headDiameter,
         @ViewBuilder content: () -> Content
     ) {
         self.isHighlighted = isHighlighted
+        self.diameter = diameter
         self.content = content()
     }
 
@@ -26,7 +29,7 @@ struct FloatingControlCircle<Content: View>: View {
 
             content
         }
-        .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+        .frame(width: diameter, height: diameter)
         .shadow(
             color: .black.opacity(isHighlighted ? 0.18 : 0.12),
             radius: isHighlighted ? 8 : DesignTokens.headShadowRadius,

@@ -13,6 +13,7 @@ struct BobbleRootView: View {
 
     @Namespace private var morphNamespace
     @State private var isShowingHistory = false
+    @State private var pendingHistorySessionToOpen: ChatSession?
 
     private let chatWidth: CGFloat = 320
     private let chatHeight: CGFloat = 480
@@ -152,18 +153,27 @@ struct BobbleRootView: View {
         ) {
             isShowingHistory.toggle()
         }
-        .popover(isPresented: $isShowingHistory, arrowEdge: dockSide == .trailing ? .trailing : .leading) {
+        .popover(
+            isPresented: $isShowingHistory,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: dockSide == .trailing ? .trailing : .leading
+        ) {
             HistoryPopoverView(
                 entries: manager.historyEntries,
                 onOpen: { entry in
+                    pendingHistorySessionToOpen = entry.session
                     isShowingHistory = false
-                    onOpenHistorySession(entry.session)
                 },
                 onDelete: { entry in
                     guard entry.isArchived else { return }
                     onDeleteHistorySession(entry.session)
                 }
             )
+        }
+        .onChange(of: isShowingHistory) { _, isPresented in
+            guard !isPresented, let session = pendingHistorySessionToOpen else { return }
+            pendingHistorySessionToOpen = nil
+            onOpenHistorySession(session)
         }
     }
 
@@ -239,6 +249,7 @@ struct BobbleRootView: View {
             },
             morphNamespace: morphNamespace
         )
+        .frame(width: headsRenderWidth, alignment: headButtonFrameAlignment)
     }
 
     @ViewBuilder
