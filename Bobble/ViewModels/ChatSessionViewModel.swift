@@ -29,6 +29,7 @@ class ChatSessionViewModel: ObservableObject {
 
     init(session: ChatSession) {
         self.session = session
+        hydrateDerivedAssistantAttachments()
     }
 
     func send() {
@@ -355,6 +356,8 @@ class ChatSessionViewModel: ObservableObject {
         } else {
             session.messages[idx].content += text
         }
+
+        syncDerivedAttachments(forMessageAt: idx)
     }
 
     private func completeAssistantMessage(with text: String) {
@@ -363,6 +366,7 @@ class ChatSessionViewModel: ObservableObject {
                 session.messages[idx].content = text
             }
             session.messages[idx].isStreaming = false
+            syncDerivedAttachments(forMessageAt: idx)
             if session.messages[idx].content.isEmpty {
                 session.messages.remove(at: idx)
             }
@@ -371,11 +375,15 @@ class ChatSessionViewModel: ObservableObject {
 
         guard !text.isEmpty else { return }
         session.messages.append(ChatMessage(role: .assistant, content: text))
+        if let idx = session.messages.indices.last {
+            syncDerivedAttachments(forMessageAt: idx)
+        }
     }
 
     private func finishAssistantRun() {
         if let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
             session.messages[idx].isStreaming = false
+            syncDerivedAttachments(forMessageAt: idx)
             if session.messages[idx].content.isEmpty {
                 let hasFollowupEvent = session.messages.indices.contains(where: { messageIndex in
                     messageIndex > idx
@@ -429,6 +437,121 @@ class ChatSessionViewModel: ObservableObject {
         }
 
         return .regular
+    }
+
+    private func hydrateDerivedAssistantAttachments() {
+        for index in session.messages.indices where session.messages[index].role == .assistant {
+            syncDerivedAttachments(forMessageAt: index)
+        }
+    }
+
+    private func syncDerivedAttachments(forMessageAt index: Int) {
+        guard session.messages.indices.contains(index) else { return }
+        guard session.messages[index].role == .assistant else { return }
+        session.messages[index].attachments = extractAttachments(fromAssistantMessage: session.messages[index].content)
+    }
+
+    private func extractAttachments(fromAssistantMessage content: String) -> [ChatAttachment] {
+        let destinations = extractMarkdownLinkDestinations(from: content)
+        guard !destinations.isEmpty else { return [] }
+
+        var attachments: [ChatAttachment] = []
+        var seenPaths = Set<String>()
+
+        for destination in destinations {
+            guard let fileURL = resolveLinkedFileURL(from: destination) else { continue }
+            guard seenPaths.insert(fileURL.path).inserted else { continue }
+            attachments.append(makeDerivedAttachment(for: fileURL))
+        }
+
+        return attachments
+    }
+
+    private func extractMarkdownLinkDestinations(from content: String) -> [String] {
+        let pattern = #"!?\[[^\]]*\]\((.+?)\)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+
+        let nsRange = NSRange(content.startIndex..., in: content)
+        return regex.matches(in: content, range: nsRange).compactMap { match in
+            guard match.numberOfRanges > 1,
+                  let range = Range(match.range(at: 1), in: content) else {
+                return nil
+            }
+            return String(content[range])
+        }
+    }
+
+    private func resolveLinkedFileURL(from rawDestination: String) -> URL? {
+        var candidate = rawDestination.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidate.isEmpty else { return nil }
+
+        if candidate.first == "<", candidate.last == ">" {
+            candidate.removeFirst()
+            candidate.removeLast()
+        }
+
+        if let hashIndex = candidate.firstIndex(of: "#") {
+            candidate = String(candidate[..<hashIndex])
+        }
+
+        candidate = candidate.removingPercentEncoding ?? candidate
+
+        if candidate.hasPrefix("file://"), let url = URL(string: candidate) {
+            return regularReadableFileURL(for: url)
+        }
+
+        guard candidate.hasPrefix("/") else { return nil }
+
+        if let exactURL = regularReadableFileURL(for: URL(fileURLWithPath: candidate)) {
+            return exactURL
+        }
+
+        let lineSuffixPattern = #":\d+(?::\d+)?$"#
+        if let regex = try? NSRegularExpression(pattern: lineSuffixPattern) {
+            let nsRange = NSRange(candidate.startIndex..., in: candidate)
+            let stripped = regex.stringByReplacingMatches(in: candidate, range: nsRange, withTemplate: "")
+            if stripped != candidate {
+                return regularReadableFileURL(for: URL(fileURLWithPath: stripped))
+            }
+        }
+
+        return nil
+    }
+
+    private func regularReadableFileURL(for url: URL) -> URL? {
+        guard url.isFileURL else { return nil }
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue,
+              FileManager.default.isReadableFile(atPath: url.path) else {
+            return nil
+        }
+
+        return url
+    }
+
+    private func makeDerivedAttachment(for fileURL: URL) -> ChatAttachment {
+        let kind: ChatAttachment.Kind = isImageFile(url: fileURL) ? .image : .file
+        return ChatAttachment(
+            kind: kind,
+            fileName: fileURL.lastPathComponent,
+            filePath: fileURL.path,
+            relativePath: relativePathForPreviewAttachment(fileURL)
+        )
+    }
+
+    private func relativePathForPreviewAttachment(_ fileURL: URL) -> String {
+        let workspaceURL = URL(fileURLWithPath: session.workspaceDirectory, isDirectory: true)
+        let workspacePath = workspaceURL.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+
+        guard filePath.hasPrefix(workspacePath) else { return filePath }
+
+        let relative = String(filePath.dropFirst(workspacePath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return relative.isEmpty ? fileURL.lastPathComponent : relative
     }
 
     private func buildPrompt(userPrompt: String, attachments: [ChatAttachment]) -> String {

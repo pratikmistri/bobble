@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 struct ChatMessage: Identifiable, Codable {
     let id: UUID
@@ -69,11 +70,87 @@ struct ChatAttachment: Identifiable, Hashable, Codable {
         URL(fileURLWithPath: filePath)
     }
 
+    var uniformType: UTType? {
+        let pathExtension = fileURL.pathExtension.isEmpty
+            ? (fileName as NSString).pathExtension
+            : fileURL.pathExtension
+        guard !pathExtension.isEmpty else { return nil }
+        return UTType(filenameExtension: pathExtension)
+    }
+
     var isImage: Bool {
         kind == .image
     }
 
+    var isTextPreviewable: Bool {
+        guard let uniformType else {
+            return fallbackTextExtensions.contains((fileName as NSString).pathExtension.lowercased())
+        }
+
+        return uniformType.conforms(to: .text)
+            || uniformType.conforms(to: .sourceCode)
+            || uniformType.conforms(to: .json)
+            || uniformType.conforms(to: .xml)
+    }
+
+    var preferredPreviewKind: PreviewKind {
+        if isImage {
+            return .image
+        }
+
+        if isTextPreviewable {
+            return .textDocument
+        }
+
+        return .document
+    }
+
+    var previewBadgeLabel: String {
+        let pathExtension = (fileName as NSString).pathExtension
+        guard !pathExtension.isEmpty else { return "FILE" }
+        return pathExtension.uppercased()
+    }
+
     var systemImageName: String {
-        isImage ? "photo" : "doc"
+        if isImage {
+            return "photo"
+        }
+
+        guard let uniformType else { return "doc" }
+
+        if uniformType.conforms(to: .pdf) {
+            return "doc.richtext"
+        }
+        if uniformType.conforms(to: .movie) {
+            return "film"
+        }
+        if uniformType.conforms(to: .audio) {
+            return "waveform"
+        }
+        if uniformType.conforms(to: .archive) {
+            return "archivebox"
+        }
+        if uniformType.conforms(to: .json) || uniformType.conforms(to: .sourceCode) {
+            return "curlybraces"
+        }
+        if uniformType.conforms(to: .text) {
+            return "doc.text"
+        }
+
+        return "doc"
+    }
+
+    enum PreviewKind {
+        case image
+        case textDocument
+        case document
+    }
+
+    private var fallbackTextExtensions: Set<String> {
+        [
+            "txt", "md", "markdown", "json", "jsonl", "yaml", "yml", "xml",
+            "swift", "m", "mm", "h", "c", "cc", "cpp", "js", "ts", "tsx", "jsx",
+            "html", "css", "scss", "sql", "sh", "zsh", "py", "rb", "go", "rs"
+        ]
     }
 }
