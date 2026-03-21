@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isRefreshingUsage = false
     private var isCollapsingSession = false
     private var panelAnchor: NSPoint = .zero
+    private var preferredPanelAnchor: NSPoint = .zero
     private var lastDragMouseLocation: NSPoint?
     private var lastDragSample: (origin: NSPoint, time: TimeInterval)?
     private var tossVelocity = CGVector.zero
@@ -180,6 +181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainPanel.delegate = self
 
         panelAnchor = positionManager.defaultPanelAnchor()
+        preferredPanelAnchor = panelAnchor
         manager.panelDockSide = .trailing
         let origin = positionManager.panelOrigin(for: size, anchor: panelAnchor, dockSide: manager.panelDockSide)
         mainPanel.setFrameOrigin(origin)
@@ -226,31 +228,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func expandSession(_ session: ChatSession) {
         stopPhysics()
 
-        // Pre-size the panel so the head->window morph has enough room immediately.
-        // Keep the current dock edge and bottom edge locked to avoid visible drift.
         let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
         let size = positionManager.expandedPanelSize(
             headsCount: manager.sessions.count,
             expandedIndex: expandedIndex
         )
-        let dockSide = manager.panelDockSide
-        let currentFrame = mainPanel.frame
-        let proposedOriginX: CGFloat
-
-        switch dockSide {
-        case .leading:
-            proposedOriginX = currentFrame.minX
-        case .trailing:
-            proposedOriginX = currentFrame.maxX - size.width
-        }
-
-        let proposedOrigin = NSPoint(x: proposedOriginX, y: currentFrame.minY)
-        let origin = positionManager.constrainedPanelOrigin(proposedOrigin, for: size, dockSide: dockSide)
-        panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: dockSide)
-        manager.panelDockSide = dockSide
-
-        // Resize panel synchronously
-        mainPanel.setFrame(NSRect(origin: origin, size: size), display: true)
+        let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
+        panelAnchor = finalState.anchor
+        manager.panelDockSide = finalState.dockSide
+        mainPanel.setFrame(finalState.frame, display: true)
 
         // Set state in the same synchronous block — SwiftUI won't re-render
         // until the run loop cycles, by which point the frame is already correct.
@@ -311,7 +297,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let finalSize = self.positionManager.collapsedPanelSize(count: self.manager.sessions.count)
             self.panelAnchor = self.positionManager.constrainedPanelAnchor(
-                self.panelAnchor,
+                self.preferredPanelAnchor,
                 for: finalSize,
                 dockSide: self.manager.panelDockSide
             )
@@ -349,23 +335,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             headsCount: max(manager.sessions.count, 1),
             expandedIndex: expandedIndex
         )
-
-        let dockSide = manager.panelDockSide
-        let currentFrame = mainPanel.frame
-        let proposedOriginX: CGFloat
-
-        switch dockSide {
-        case .leading:
-            proposedOriginX = currentFrame.minX
-        case .trailing:
-            proposedOriginX = currentFrame.maxX - size.width
-        }
-
-        let proposedOrigin = NSPoint(x: proposedOriginX, y: currentFrame.minY)
-        let origin = positionManager.constrainedPanelOrigin(proposedOrigin, for: size, dockSide: dockSide)
-        panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: dockSide)
-        manager.panelDockSide = dockSide
-        mainPanel.setFrame(NSRect(origin: origin, size: size), display: true)
+        let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
+        panelAnchor = finalState.anchor
+        manager.panelDockSide = finalState.dockSide
+        mainPanel.setFrame(finalState.frame, display: true)
 
         withAnimation(DesignTokens.motionLayout) {
             manager.expandedSessionId = session.id
@@ -402,37 +375,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch mode {
         case .fullFrame:
-            let targetDockSide = preferredDockSideForCurrentFrame()
-            let resolvedAnchor = positionManager.constrainedPanelAnchor(panelAnchor, for: size, dockSide: targetDockSide)
-            let finalOrigin = positionManager.panelOrigin(for: size, anchor: resolvedAnchor, dockSide: targetDockSide)
-            finalFrame = NSRect(origin: finalOrigin, size: size)
-            finalDockSide = targetDockSide
-            finalAnchor = resolvedAnchor
+            let finalState = resolvedPanelState(for: size)
+            finalFrame = finalState.frame
+            finalDockSide = finalState.dockSide
+            finalAnchor = finalState.anchor
 
             panelAnchor = finalAnchor
             manager.panelDockSide = finalDockSide
             animatedFrame = finalFrame
 
         case .verticalCollapse:
-            // Keep controls visually locked in place while collapsing:
-            // preserve the current bottom edge and current dock edge, and avoid
-            // re-solving/clamping origin during this transition.
-            finalDockSide = manager.panelDockSide
-            let currentFrame = mainPanel.frame
-            let finalOriginX: CGFloat
-            switch finalDockSide {
-            case .leading:
-                finalOriginX = currentFrame.minX
-            case .trailing:
-                finalOriginX = currentFrame.maxX - size.width
-            }
-            let finalOrigin = NSPoint(x: finalOriginX, y: currentFrame.minY)
-            finalFrame = NSRect(origin: finalOrigin, size: size)
-            finalAnchor = positionManager.panelAnchor(
-                for: finalOrigin,
-                size: size,
-                dockSide: finalDockSide
-            )
+            let finalState = resolvedPanelState(for: size)
+            finalFrame = finalState.frame
+            finalDockSide = finalState.dockSide
+            finalAnchor = finalState.anchor
             animatedFrame = finalFrame
         }
 
@@ -449,6 +405,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.mainPanel.setFrame(finalFrame, display: true)
             completion?()
         }
+    }
+
+    private func resolvedPanelState(
+        for size: NSSize,
+        selectingBestDockSide: Bool = false
+    ) -> (frame: NSRect, anchor: NSPoint, dockSide: PanelDockSide) {
+        let dockSide = selectingBestDockSide
+            ? bestDockSide(for: size, preferred: manager.panelDockSide)
+            : manager.panelDockSide
+        let anchor = positionManager.constrainedPanelAnchor(preferredPanelAnchor, for: size, dockSide: dockSide)
+        let origin = positionManager.panelOrigin(for: size, anchor: anchor, dockSide: dockSide)
+        return (
+            frame: NSRect(origin: origin, size: size),
+            anchor: anchor,
+            dockSide: dockSide
+        )
+    }
+
+    private func bestDockSide(for size: NSSize, preferred: PanelDockSide) -> PanelDockSide {
+        let alternate: PanelDockSide = preferred == .leading ? .trailing : .leading
+        let preferredShift = anchorShift(for: size, dockSide: preferred)
+        let alternateShift = anchorShift(for: size, dockSide: alternate)
+
+        // Keep the current side if it already preserves the user's placement.
+        if preferredShift <= 0.5 {
+            return preferred
+        }
+
+        // Otherwise choose the side that moves the anchored heads the least.
+        if alternateShift + 0.5 < preferredShift {
+            return alternate
+        }
+
+        return preferred
+    }
+
+    private func anchorShift(for size: NSSize, dockSide: PanelDockSide) -> CGFloat {
+        let resolvedAnchor = positionManager.constrainedPanelAnchor(preferredPanelAnchor, for: size, dockSide: dockSide)
+        return abs(resolvedAnchor.x - preferredPanelAnchor.x)
     }
 
     private func movePanelWithMouse() {
@@ -478,6 +473,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         mainPanel.setFrameOrigin(resolvedOrigin)
         panelAnchor = positionManager.panelAnchor(for: resolvedOrigin, size: size, dockSide: manager.panelDockSide)
+        preferredPanelAnchor = panelAnchor
         self.lastDragMouseLocation = mouseLocation
 
         if let lastDragSample {
@@ -503,15 +499,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             size: mainPanel.frame.size,
             dockSide: manager.panelDockSide
         )
+        preferredPanelAnchor = panelAnchor
         startPhysicsIfNeeded()
-    }
-
-    private func preferredDockSideForCurrentFrame() -> PanelDockSide {
-        positionManager.preferredDockSide(
-            for: mainPanel.frame.origin,
-            size: mainPanel.frame.size,
-            currentSide: manager.panelDockSide
-        )
     }
 
     private func startPhysicsIfNeeded() {
@@ -565,6 +554,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         mainPanel.setFrameOrigin(origin)
         panelAnchor = positionManager.panelAnchor(for: origin, size: size, dockSide: manager.panelDockSide)
+        preferredPanelAnchor = panelAnchor
         tossVelocity = velocity
 
         if hypot(velocity.dx, velocity.dy) < 18 {
