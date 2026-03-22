@@ -195,6 +195,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         manager.onSessionAdded = { [weak self] session in
+            self?.suppressNextPanelSizeUpdate = true
             self?.expandSession(session)
         }
     }
@@ -236,12 +237,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
         panelAnchor = finalState.anchor
         manager.panelDockSide = finalState.dockSide
-        mainPanel.setFrame(finalState.frame, display: true)
+        performPanelLayoutMutation {
+            self.mainPanel.setFrame(finalState.frame, display: true)
 
-        // Set state in the same synchronous block — SwiftUI won't re-render
-        // until the run loop cycles, by which point the frame is already correct.
-        withAnimation(DesignTokens.motionLayout) {
-            manager.expandedSessionId = session.id
+            // Keep the SwiftUI state flip paired with the panel resize, but
+            // defer both until the hosting view has finished its current layout pass.
+            withAnimation(DesignTokens.motionLayout) {
+                self.manager.expandedSessionId = session.id
+            }
         }
     }
 
@@ -306,8 +309,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 anchor: self.panelAnchor,
                 dockSide: self.manager.panelDockSide
             )
-            self.mainPanel.setFrame(NSRect(origin: finalOrigin, size: finalSize), display: true)
-            self.isCollapsingSession = false
+            self.performPanelLayoutMutation {
+                self.mainPanel.setFrame(NSRect(origin: finalOrigin, size: finalSize), display: true)
+                self.isCollapsingSession = false
+            }
         }
     }
 
@@ -338,10 +343,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
         panelAnchor = finalState.anchor
         manager.panelDockSide = finalState.dockSide
-        mainPanel.setFrame(finalState.frame, display: true)
+        performPanelLayoutMutation {
+            self.mainPanel.setFrame(finalState.frame, display: true)
 
-        withAnimation(DesignTokens.motionLayout) {
-            manager.expandedSessionId = session.id
+            withAnimation(DesignTokens.motionLayout) {
+                self.manager.expandedSessionId = session.id
+            }
         }
     }
 
@@ -392,19 +399,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             animatedFrame = finalFrame
         }
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
-            mainPanel.animator().setFrame(
-                animatedFrame,
-                display: true
-            )
-        } completionHandler: {
-            self.panelAnchor = finalAnchor
-            self.manager.panelDockSide = finalDockSide
-            self.mainPanel.setFrame(finalFrame, display: true)
-            completion?()
+        performPanelLayoutMutation {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = duration
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
+                self.mainPanel.animator().setFrame(
+                    animatedFrame,
+                    display: true
+                )
+            } completionHandler: {
+                self.panelAnchor = finalAnchor
+                self.manager.panelDockSide = finalDockSide
+                self.performPanelLayoutMutation {
+                    self.mainPanel.setFrame(finalFrame, display: true)
+                    completion?()
+                }
+            }
         }
+    }
+
+    private func performPanelLayoutMutation(_ mutation: @escaping () -> Void) {
+        DispatchQueue.main.async(execute: mutation)
     }
 
     private func resolvedPanelState(
