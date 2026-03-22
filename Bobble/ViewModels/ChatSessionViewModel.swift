@@ -28,6 +28,7 @@ class ChatSessionViewModel: ObservableObject {
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
     private var shouldRecycleCopilotTransportAfterTurn = false
+    private var shouldResetTransportAfterTurn = false
     private var pendingTextReplyInterruptionID: String?
 
     init(session: ChatSession) {
@@ -104,7 +105,7 @@ class ChatSessionViewModel: ObservableObject {
             sessionId: session.cliSessionId,
             isResume: shouldResume,
             workingDirectory: session.workspaceDirectory,
-            model: session.selectedModel.cliValue,
+            model: session.selectedModel.cliValue(for: backend),
             executionMode: session.conversationMode
         )
         transport.sendTurn(request)
@@ -116,16 +117,26 @@ class ChatSessionViewModel: ObservableObject {
         chatHeadSymbolProcess = nil
     }
 
-    func selectModel(_ model: CodexModelOption) {
-        guard session.provider == .codex else { return }
-        guard session.selectedModel != model else { return }
-        session.selectedModel = model
+    func selectModel(_ model: ProviderModelOption) {
+        let normalized = model.normalized(for: session.provider)
+        guard normalized.isAvailable(for: session.provider) else { return }
+        guard session.selectedModel != normalized else { return }
+        session.selectedModel = normalized
+        session.cliSessionId = UUID().uuidString
+        session.cliSessionBackend = nil
+        if case .running = session.state {
+            shouldResetTransportAfterTurn = true
+            notifyUpdate()
+            return
+        }
+        resetConversationTransport()
         notifyUpdate()
     }
 
     func updateProvider(_ provider: CLIBackend) {
         guard session.provider != provider else { return }
         session.provider = provider
+        session.selectedModel = session.selectedModel.normalized(for: provider)
         session.cliSessionId = UUID().uuidString
         session.cliSessionBackend = nil
         resetConversationTransport()
@@ -336,6 +347,7 @@ class ChatSessionViewModel: ObservableObject {
         conversationTransport = nil
         conversationTransportBackend = nil
         shouldRecycleCopilotTransportAfterTurn = false
+        shouldResetTransportAfterTurn = false
         pendingTextReplyInterruptionID = nil
     }
 
@@ -343,6 +355,7 @@ class ChatSessionViewModel: ObservableObject {
         let shouldReset = forceReset
             || !(conversationTransport?.persistsAcrossTurns ?? false)
             || shouldRecycleCopilotTransportAfterTurn
+            || shouldResetTransportAfterTurn
 
         if shouldReset {
             resetConversationTransport()
@@ -788,7 +801,7 @@ class ChatSessionViewModel: ObservableObject {
         let process = CLIProcessManager(
             backend: backend,
             executablePath: path,
-            model: session.selectedModel.cliValue,
+            model: session.selectedModel.cliValue(for: backend),
             prompt: buildChatHeadSymbolPrompt(from: seed),
             imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: UUID().uuidString,

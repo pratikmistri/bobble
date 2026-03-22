@@ -484,6 +484,9 @@ final class CopilotACPTransport: ConversationTransport {
 
     private func makeArguments() -> [String] {
         var args = ["--acp", "--stdio"]
+        if let model = pendingTurnRequest?.model {
+            args += ["--model", model]
+        }
         if executionMode == .bypass {
             args += ["--allow-all", "--no-ask-user"]
         }

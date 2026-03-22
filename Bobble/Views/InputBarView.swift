@@ -75,13 +75,17 @@ struct InputBarView: View {
                     .disabled(viewModel.isCapturingScreenshot)
                     .help("Capture screenshot")
 
-                    if viewModel.session.provider == .codex {
-                        ModelPickerMenu(selectedModel: viewModel.session.selectedModel) { model in
-                            viewModel.selectModel(model)
-                        }
-                    } else if showProviderBadge {
+                    if showProviderBadge && viewModel.session.provider != .codex {
                         ProviderBadgeView(provider: viewModel.session.provider)
                             .help("Switch providers from the menu bar icon")
+                    }
+
+                    ProviderModelMenu(
+                        provider: viewModel.session.provider,
+                        selectedModel: viewModel.session.selectedModel,
+                        isDisabled: isConversationRunning
+                    ) { model in
+                        viewModel.selectModel(model)
                     }
 
                     ConversationModeMenu(
@@ -185,18 +189,20 @@ struct InputBarView: View {
     }
 }
 
-struct ModelPickerMenu: View {
-    let selectedModel: CodexModelOption
-    let onSelect: (CodexModelOption) -> Void
+struct ProviderModelMenu: View {
+    let provider: CLIBackend
+    let selectedModel: ProviderModelOption
+    let isDisabled: Bool
+    let onSelect: (ProviderModelOption) -> Void
 
     var body: some View {
         Menu {
-            ForEach(CodexModelOption.allCases) { model in
+            ForEach(ProviderModelOption.availableOptions(for: provider)) { model in
                 Button(action: { onSelect(model) }) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(model.displayName)
-                            Text(model.subtitle)
+                            Text(model.displayName(for: provider))
+                            Text(model.subtitle(for: provider))
                                 .font(.system(size: 11))
                                 .foregroundColor(DesignTokens.textSecondary)
                         }
@@ -209,29 +215,25 @@ struct ModelPickerMenu: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "cpu")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(selectedModel.displayName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundColor(DesignTokens.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(DesignTokens.surfaceAccent.opacity(0.32))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
-            )
+            Text(selectedModel.normalized(for: provider).shortLabel(for: provider))
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+                .foregroundColor(DesignTokens.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(DesignTokens.surfaceAccent.opacity(0.32))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
+                )
         }
         .menuStyle(.borderlessButton)
-        .help("Choose the Codex model for the next message")
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.55 : 1.0)
+        .help(isDisabled ? "Model changes apply after the current turn finishes" : "Choose the \(provider.shortLabel) model for the next message")
     }
 }
 
@@ -260,26 +262,20 @@ struct ConversationModeMenu: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: selectedMode == .ask ? "questionmark.circle" : "bolt.shield")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(selectedMode.displayName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundColor(DesignTokens.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(DesignTokens.surfaceAccent.opacity(0.32))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
-            )
+            Text(selectedMode.displayName)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+                .foregroundColor(DesignTokens.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(DesignTokens.surfaceAccent.opacity(0.32))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
+                )
         }
         .menuStyle(.borderlessButton)
         .disabled(isDisabled)

@@ -119,24 +119,72 @@ enum CLIBackend: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum CodexModelOption: String, CaseIterable, Identifiable, Codable {
-    case `default` = "default"
+enum ProviderModelOption: String, CaseIterable, Identifiable, Codable {
+    case automatic = "default"
     case gpt5Codex = "gpt-5-codex"
     case gpt53Codex = "gpt-5.3-codex"
     case gpt52Codex = "gpt-5.2-codex"
     case gpt51Codex = "gpt-5.1-codex"
     case gpt51CodexMax = "gpt-5.1-codex-max"
     case gpt51CodexMini = "gpt-5.1-codex-mini"
+    case claudeSonnet46 = "claude-sonnet-4-6"
+    case claudeOpus46 = "claude-opus-4-6"
+    case claudeHaiku45 = "claude-haiku-4-5"
+    case copilotClaudeSonnet45 = "Claude Sonnet 4.5"
+    case copilotClaudeOpus45 = "Claude Opus 4.5"
+    case copilotClaudeOpus46 = "Claude Opus 4.6"
+    case copilotGPT51CodexMax = "GPT-5.1-Codex-Max"
+    case copilotGPT52Codex = "GPT-5.2-Codex"
 
     var id: String { rawValue }
 
-    var cliValue: String? {
-        self == .default ? nil : rawValue
+    static func availableOptions(for provider: CLIBackend) -> [ProviderModelOption] {
+        switch provider {
+        case .codex:
+            return [
+                .automatic,
+                .gpt5Codex,
+                .gpt53Codex,
+                .gpt52Codex,
+                .gpt51Codex,
+                .gpt51CodexMax,
+                .gpt51CodexMini
+            ]
+        case .claude:
+            return [
+                .automatic,
+                .claudeSonnet46,
+                .claudeOpus46,
+                .claudeHaiku45
+            ]
+        case .copilot:
+            return [
+                .automatic,
+                .copilotClaudeSonnet45,
+                .copilotClaudeOpus45,
+                .copilotClaudeOpus46,
+                .copilotGPT51CodexMax,
+                .copilotGPT52Codex
+            ]
+        }
     }
 
-    var displayName: String {
+    func isAvailable(for provider: CLIBackend) -> Bool {
+        Self.availableOptions(for: provider).contains(self)
+    }
+
+    func normalized(for provider: CLIBackend) -> ProviderModelOption {
+        isAvailable(for: provider) ? self : .automatic
+    }
+
+    func cliValue(for provider: CLIBackend) -> String? {
+        guard isAvailable(for: provider), self != .automatic else { return nil }
+        return rawValue
+    }
+
+    func displayName(for provider: CLIBackend) -> String {
         switch self {
-        case .default:
+        case .automatic:
             return "Auto"
         case .gpt5Codex:
             return "GPT-5 Codex"
@@ -150,12 +198,28 @@ enum CodexModelOption: String, CaseIterable, Identifiable, Codable {
             return "GPT-5.1 Codex Max"
         case .gpt51CodexMini:
             return "GPT-5.1 Codex Mini"
+        case .claudeSonnet46:
+            return "Claude Sonnet 4.6"
+        case .claudeOpus46:
+            return "Claude Opus 4.6"
+        case .claudeHaiku45:
+            return "Claude Haiku 4.5"
+        case .copilotClaudeSonnet45:
+            return "Claude Sonnet 4.5"
+        case .copilotClaudeOpus45:
+            return "Claude Opus 4.5"
+        case .copilotClaudeOpus46:
+            return "Claude Opus 4.6"
+        case .copilotGPT51CodexMax:
+            return "GPT-5.1 Codex Max"
+        case .copilotGPT52Codex:
+            return "GPT-5.2 Codex"
         }
     }
 
-    var shortLabel: String {
+    func shortLabel(for provider: CLIBackend) -> String {
         switch self {
-        case .default:
+        case .automatic:
             return "Auto"
         case .gpt5Codex:
             return "5 Codex"
@@ -169,13 +233,36 @@ enum CodexModelOption: String, CaseIterable, Identifiable, Codable {
             return "5.1 Max"
         case .gpt51CodexMini:
             return "5.1 Mini"
+        case .claudeSonnet46:
+            return "Sonnet 4.6"
+        case .claudeOpus46:
+            return "Opus 4.6"
+        case .claudeHaiku45:
+            return "Haiku 4.5"
+        case .copilotClaudeSonnet45:
+            return "Sonnet 4.5"
+        case .copilotClaudeOpus45:
+            return "Opus 4.5"
+        case .copilotClaudeOpus46:
+            return "Opus 4.6"
+        case .copilotGPT51CodexMax:
+            return "5.1 Max"
+        case .copilotGPT52Codex:
+            return "5.2 Codex"
         }
     }
 
-    var subtitle: String {
+    func subtitle(for provider: CLIBackend) -> String {
         switch self {
-        case .default:
-            return "Use the Codex CLI default model."
+        case .automatic:
+            switch provider {
+            case .codex:
+                return "Use the Codex CLI default model."
+            case .claude:
+                return "Use Claude Code's default model."
+            case .copilot:
+                return "Use GitHub Copilot's default model."
+            }
         case .gpt5Codex:
             return "General-purpose Codex-optimized coding model."
         case .gpt53Codex:
@@ -188,6 +275,22 @@ enum CodexModelOption: String, CaseIterable, Identifiable, Codable {
             return "GPT-5.1 Codex variant for longer-running tasks."
         case .gpt51CodexMini:
             return "Smaller, cheaper GPT-5.1 Codex variant."
+        case .claudeSonnet46:
+            return "Balanced Claude model for most coding tasks."
+        case .claudeOpus46:
+            return "Most capable Claude model for harder tasks."
+        case .claudeHaiku45:
+            return "Fast Claude model for lighter requests."
+        case .copilotClaudeSonnet45:
+            return "Balanced Copilot coding-agent model."
+        case .copilotClaudeOpus45:
+            return "Stronger Anthropic model available in Copilot."
+        case .copilotClaudeOpus46:
+            return "Most capable Anthropic option currently listed for Copilot."
+        case .copilotGPT51CodexMax:
+            return "OpenAI Codex model for deeper coding tasks."
+        case .copilotGPT52Codex:
+            return "Newer Codex option available through Copilot."
         }
     }
 }

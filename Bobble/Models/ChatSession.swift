@@ -59,7 +59,7 @@ struct ChatSession: Identifiable, Codable {
     var chatHeadSymbol: String
     var provider: CLIBackend
     var conversationMode: ConversationExecutionMode
-    var selectedModel: CodexModelOption
+    var selectedModel: ProviderModelOption
     var messages: [ChatMessage]
     var state: SessionState
     var cliSessionId: String
@@ -147,7 +147,7 @@ struct ChatSession: Identifiable, Codable {
         chatHeadSymbol: String = Self.defaultChatHeadSymbol,
         provider: CLIBackend = .codex,
         conversationMode: ConversationExecutionMode? = nil,
-        selectedModel: CodexModelOption = .default,
+        selectedModel: ProviderModelOption = .automatic,
         messages: [ChatMessage] = [],
         state: SessionState = .idle,
         cliSessionId: String = UUID().uuidString,
@@ -162,7 +162,7 @@ struct ChatSession: Identifiable, Codable {
         self.chatHeadSymbol = chatHeadSymbol
         self.provider = provider
         self.conversationMode = conversationMode ?? ConversationExecutionMode.defaultMode(for: provider)
-        self.selectedModel = selectedModel
+        self.selectedModel = selectedModel.normalized(for: provider)
         self.messages = messages
         self.state = state
         self.cliSessionId = cliSessionId
@@ -182,7 +182,7 @@ struct ChatSession: Identifiable, Codable {
         let provider = try container.decode(CLIBackend.self, forKey: .provider)
         let conversationMode = try container.decodeIfPresent(ConversationExecutionMode.self, forKey: .conversationMode)
             ?? ConversationExecutionMode.defaultMode(for: provider)
-        let selectedModel = try container.decode(CodexModelOption.self, forKey: .selectedModel)
+        let selectedModel = try container.decodeIfPresent(ProviderModelOption.self, forKey: .selectedModel) ?? .automatic
         let messages = try container.decode([ChatMessage].self, forKey: .messages)
         let state = try container.decode(SessionState.self, forKey: .state)
         let cliSessionId = try container.decode(String.self, forKey: .cliSessionId)
