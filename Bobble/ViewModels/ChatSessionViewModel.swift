@@ -28,6 +28,7 @@ class ChatSessionViewModel: ObservableObject {
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
     private var shouldRecycleCopilotTransportAfterTurn = false
+    private var pendingTextReplyInterruptionID: String?
 
     init(session: ChatSession) {
         self.session = session
@@ -39,6 +40,7 @@ class ChatSessionViewModel: ObservableObject {
         let attachments = pendingAttachments
         guard !prompt.isEmpty || !attachments.isEmpty else { return }
         let isFirstUserTurn = session.messages.isEmpty
+        let backend = session.provider
 
         inputText = ""
         pendingAttachments = []
@@ -58,7 +60,19 @@ class ChatSessionViewModel: ObservableObject {
             updateChatHeadSymbolFromFirstMessage(prompt: prompt, attachments: attachments)
         }
 
-        let backend = session.provider
+        if let replyInterruptionID = pendingTextReplyInterruptionID,
+           let transport = conversationTransport {
+            session.state = .running
+            self.pendingTextReplyInterruptionID = nil
+            transport.resolveInterruption(
+                id: replyInterruptionID,
+                actionTransportValue: nil,
+                textResponse: buildPrompt(userPrompt: prompt, attachments: attachments)
+            )
+            notifyUpdate()
+            return
+        }
+
         guard let path = backend.resolvedPath() else {
             let errorMsg = ChatMessage(
                 role: .error,
@@ -145,7 +159,15 @@ class ChatSessionViewModel: ObservableObject {
             session.conversationMode = .bypass
         }
 
-        conversationTransport?.resolveInterruption(id: interruptionID, actionTransportValue: transportValue)
+        if pendingTextReplyInterruptionID == interruptionID {
+            pendingTextReplyInterruptionID = nil
+        }
+
+        conversationTransport?.resolveInterruption(
+            id: interruptionID,
+            actionTransportValue: transportValue,
+            textResponse: nil
+        )
         clearInterruptionActions(containing: action.id)
         notifyUpdate()
     }
@@ -195,8 +217,9 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.appendInterruptionMessage(interruption)
-                if interruption.actions.isEmpty {
-                    self.finishAssistantRun()
+                self.finishAssistantRun()
+                if interruption.responseMode == .textReply {
+                    self.pendingTextReplyInterruptionID = interruption.id
                 }
                 self.notifyUpdate()
             }
@@ -206,6 +229,7 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.finishAssistantRun()
+                self.pendingTextReplyInterruptionID = nil
                 self.handleTurnLifecycleCompletion()
                 self.notifyUpdate()
             }
@@ -233,6 +257,7 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.finishAssistantRun()
+                self.pendingTextReplyInterruptionID = nil
                 self.notifyUpdate()
             }
         }
@@ -247,6 +272,7 @@ class ChatSessionViewModel: ObservableObject {
                 self.session.messages.append(errorMsg)
                 self.session.state = .error(error)
                 self.session.cliSessionBackend = nil
+                self.pendingTextReplyInterruptionID = nil
                 self.handleTurnLifecycleCompletion(forceReset: true)
                 self.notifyUpdate()
             }
@@ -254,29 +280,55 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     private func transportForCurrentConversation(executablePath: String) -> ConversationTransport {
-        if session.provider == .copilot,
-           let existing = conversationTransport as? CopilotACPTransport,
-           conversationTransportBackend == .copilot {
-            return existing
-        }
+        switch session.provider {
+        case .copilot:
+            if let existing = conversationTransport as? CopilotACPTransport,
+               conversationTransportBackend == .copilot {
+                return existing
+            }
 
-        if session.provider != .copilot {
             resetConversationTransport()
-            let transport = CLIConversationTransport()
+            let transport = CopilotACPTransport(
+                executablePath: executablePath,
+                workingDirectory: session.workspaceDirectory,
+                executionMode: session.conversationMode
+            )
             conversationTransport = transport
-            conversationTransportBackend = session.provider
+            conversationTransportBackend = .copilot
+            return transport
+
+        case .claude:
+            if let existing = conversationTransport as? ClaudeInteractiveTransport,
+               conversationTransportBackend == .claude {
+                return existing
+            }
+
+            resetConversationTransport()
+            let transport = ClaudeInteractiveTransport(
+                executablePath: executablePath,
+                workingDirectory: session.workspaceDirectory,
+                executionMode: session.conversationMode
+            )
+            conversationTransport = transport
+            conversationTransportBackend = .claude
+            return transport
+
+        case .codex:
+            if let existing = conversationTransport as? CodexAppServerTransport,
+               conversationTransportBackend == .codex {
+                return existing
+            }
+
+            resetConversationTransport()
+            let transport = CodexAppServerTransport(
+                executablePath: executablePath,
+                workingDirectory: session.workspaceDirectory,
+                executionMode: session.conversationMode
+            )
+            conversationTransport = transport
+            conversationTransportBackend = .codex
             return transport
         }
-
-        resetConversationTransport()
-        let transport = CopilotACPTransport(
-            executablePath: executablePath,
-            workingDirectory: session.workspaceDirectory,
-            executionMode: session.conversationMode
-        )
-        conversationTransport = transport
-        conversationTransportBackend = .copilot
-        return transport
     }
 
     private func resetConversationTransport() {
@@ -284,11 +336,12 @@ class ChatSessionViewModel: ObservableObject {
         conversationTransport = nil
         conversationTransportBackend = nil
         shouldRecycleCopilotTransportAfterTurn = false
+        pendingTextReplyInterruptionID = nil
     }
 
     private func handleTurnLifecycleCompletion(forceReset: Bool = false) {
         let shouldReset = forceReset
-            || conversationTransportBackend != .copilot
+            || !(conversationTransport?.persistsAcrossTurns ?? false)
             || shouldRecycleCopilotTransportAfterTurn
 
         if shouldReset {

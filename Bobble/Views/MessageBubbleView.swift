@@ -190,25 +190,21 @@ struct MessageBubbleView: View {
     @ViewBuilder
     private var interruptionCardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 Image(systemName: interruptionCardIconName)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(interruptionCardAccentColor)
-                    .frame(width: 18, height: 18)
+                    .frame(width: 18, height: 18, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(interruptionCardTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(DesignTokens.textPrimary)
+                Text(interruptionCardTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(DesignTokens.textPrimary)
 
-                    Text(message.interruptionCardBody)
-                        .font(DesignTokens.messageFont)
-                        .foregroundColor(DesignTokens.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-
-                Spacer(minLength: 0)
+                Text(message.interruptionCardBody)
+                    .font(DesignTokens.messageFont)
+                    .foregroundColor(DesignTokens.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             }
 
             if !message.interruptionActions.isEmpty {
@@ -233,7 +229,6 @@ struct MessageBubbleView: View {
                         .opacity(onInterruptionAction == nil ? 0.55 : 1)
                     }
                 }
-                .padding(.leading, 28)
             }
         }
     }

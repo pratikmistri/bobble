@@ -1,6 +1,7 @@
 import Foundation
 
 final class CopilotACPTransport: ConversationTransport {
+    let persistsAcrossTurns = true
     var onTextChunk: ((String) -> Void)?
     var onResult: ((String) -> Void)?
     var onEventText: ((String) -> Void)?
@@ -63,7 +64,7 @@ final class CopilotACPTransport: ConversationTransport {
         }
     }
 
-    func resolveInterruption(id: String, actionTransportValue: String?) {
+    func resolveInterruption(id: String, actionTransportValue: String?, textResponse: String?) {
         queue.async {
             guard let requestID = self.interruptionRequestIDs.removeValue(forKey: id) else { return }
             self.respondToPermissionRequest(requestID: requestID, optionID: actionTransportValue)
@@ -400,7 +401,8 @@ final class CopilotACPTransport: ConversationTransport {
                 provider: .copilot,
                 title: "Copilot needs approval",
                 details: details.joined(separator: "\n"),
-                actions: actions
+                actions: actions,
+                responseMode: .actionButtons
             )
         )
     }

@@ -17,6 +17,12 @@ struct ConversationInterruption {
         case question
     }
 
+    enum ResponseMode {
+        case informational
+        case actionButtons
+        case textReply
+    }
+
     struct Action {
         enum Role {
             case primary
@@ -36,9 +42,11 @@ struct ConversationInterruption {
     let title: String
     let details: String
     let actions: [Action]
+    let responseMode: ResponseMode
 }
 
 protocol ConversationTransport: AnyObject {
+    var persistsAcrossTurns: Bool { get }
     var onTextChunk: ((String) -> Void)? { get set }
     var onResult: ((String) -> Void)? { get set }
     var onEventText: ((String) -> Void)? { get set }
@@ -51,10 +59,11 @@ protocol ConversationTransport: AnyObject {
 
     func sendTurn(_ request: ConversationTurnRequest)
     func stop()
-    func resolveInterruption(id: String, actionTransportValue: String?)
+    func resolveInterruption(id: String, actionTransportValue: String?, textResponse: String?)
 }
 
 final class CLIConversationTransport: ConversationTransport {
+    let persistsAcrossTurns = false
     var onTextChunk: ((String) -> Void)?
     var onResult: ((String) -> Void)?
     var onEventText: ((String) -> Void)?
@@ -150,7 +159,7 @@ final class CLIConversationTransport: ConversationTransport {
         processManager = nil
     }
 
-    func resolveInterruption(id: String, actionTransportValue: String?) {
+    func resolveInterruption(id: String, actionTransportValue: String?, textResponse: String?) {
         // One-shot CLI transports render interruptions as informative cards only.
     }
 
@@ -180,7 +189,8 @@ final class CLIConversationTransport: ConversationTransport {
             provider: backend,
             title: title,
             details: text,
-            actions: []
+            actions: [],
+            responseMode: .informational
         )
     }
 }

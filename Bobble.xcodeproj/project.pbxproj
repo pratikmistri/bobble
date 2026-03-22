@@ -29,6 +29,8 @@
 		A10000020 /* FloatingControlCircle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022 /* FloatingControlCircle.swift */; };
 		A10000021 /* ConversationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000023 /* ConversationTransport.swift */; };
 		A10000022 /* CopilotACPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000024 /* CopilotACPTransport.swift */; };
+		A10000025 /* ClaudeInteractiveTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000025 /* ClaudeInteractiveTransport.swift */; };
+		A10000026 /* CodexAppServerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000026 /* CodexAppServerTransport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +58,8 @@
 		B10000022 /* FloatingControlCircle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingControlCircle.swift; sourceTree = "<group>"; };
 		B10000023 /* ConversationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationTransport.swift; sourceTree = "<group>"; };
 		B10000024 /* CopilotACPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotACPTransport.swift; sourceTree = "<group>"; };
+		B10000025 /* ClaudeInteractiveTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeInteractiveTransport.swift; sourceTree = "<group>"; };
+		B10000026 /* CodexAppServerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerTransport.swift; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -122,6 +126,8 @@
 				B10000012 /* StreamParser.swift */,
 				B10000023 /* ConversationTransport.swift */,
 				B10000024 /* CopilotACPTransport.swift */,
+				B10000025 /* ClaudeInteractiveTransport.swift */,
+				B10000026 /* CodexAppServerTransport.swift */,
 			);
 			path = Process;
 			sourceTree = "<group>";
@@ -258,6 +264,8 @@
 				A10000020 /* FloatingControlCircle.swift in Sources */,
 				A10000021 /* ConversationTransport.swift in Sources */,
 				A10000022 /* CopilotACPTransport.swift in Sources */,
+				A10000025 /* ClaudeInteractiveTransport.swift in Sources */,
+				A10000026 /* CodexAppServerTransport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
