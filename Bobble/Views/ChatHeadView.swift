@@ -14,7 +14,7 @@ struct ChatHeadView: View {
     @State private var isHovering = false
     @State private var isDropTargeted = false
     @State private var isShowingPreview = false
-    @State private var statusBlink = false
+    @State private var isEmojiBobbling = false
     @State private var previewTask: Task<Void, Never>?
     private let controlShellDiameter: CGFloat = DesignTokens.headDiameter + 8
 
@@ -45,7 +45,15 @@ struct ChatHeadView: View {
 
             Text(session.displayChatHeadSymbol)
                 .font(DesignTokens.headInitialFont)
-                .foregroundColor(DesignTokens.textPrimary)
+                .foregroundStyle(DesignTokens.textPrimary)
+                .scaleEffect(isWorking ? (isEmojiBobbling ? 1.08 : 0.95) : 1.0)
+                .rotationEffect(.degrees(isWorking ? (isEmojiBobbling ? 6 : -5) : 0))
+                .offset(y: isWorking ? (isEmojiBobbling ? -2 : 2) : 0)
+                .shadow(
+                    color: HeadStatus.working.color.opacity(isWorking ? (isEmojiBobbling ? 0.42 : 0.18) : 0),
+                    radius: isWorking ? (isEmojiBobbling ? 10 : 4) : 0,
+                    y: isWorking ? (isEmojiBobbling ? 4 : 1) : 0
+                )
 
             // Selection ring — animated stroke
             Circle()
@@ -80,7 +88,7 @@ struct ChatHeadView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if let status = statusIndicator {
+            if let status = badgeStatus {
                 statusIndicatorView(for: status)
                     .offset(x: 1, y: -1)
                     .transition(.scale.combined(with: .opacity))
@@ -113,6 +121,12 @@ struct ChatHeadView: View {
                 dismissPreview()
             }
         }
+        .onAppear {
+            updateWorkingAnimation()
+        }
+        .onChange(of: headStatus) { _, _ in
+            updateWorkingAnimation()
+        }
         .onTapGesture {
             dismissPreview()
             onTap()
@@ -127,13 +141,18 @@ struct ChatHeadView: View {
         }
         .onDisappear {
             dismissPreview()
+            stopWorkingAnimation()
         }
         .contextMenu {
             Text(session.name)
         }
     }
 
-    private var statusIndicator: HeadStatus? {
+    private var isWorking: Bool {
+        headStatus == .working
+    }
+
+    private var headStatus: HeadStatus? {
         switch session.state {
         case .running:
             return .working
@@ -141,6 +160,17 @@ struct ChatHeadView: View {
             return .needsHelp
         case .idle:
             return session.hasUnread ? .completed : nil
+        }
+    }
+
+    private var badgeStatus: HeadStatus? {
+        switch headStatus {
+        case .working, nil:
+            return nil
+        case .needsHelp:
+            return .needsHelp
+        case .completed:
+            return .completed
         }
     }
 
@@ -249,17 +279,7 @@ struct ChatHeadView: View {
     @ViewBuilder
     private func statusIndicatorView(for status: HeadStatus) -> some View {
         switch status {
-        case .working:
-            Circle()
-                .fill(status.color)
-                .frame(width: 12, height: 12)
-                .scaleEffect(statusBlink ? (4.0 / 12.0) : 1.0)
-                .shadow(color: status.color.opacity(0.7), radius: 7)
-                .id("status-working")
-                .onAppear { startStatusBlink() }
-                .onDisappear { stopStatusBlink() }
-
-        case .needsHelp, .completed:
+        case .working, .needsHelp, .completed:
             Circle()
                 .fill(status.color)
                 .frame(width: 12, height: 12)
@@ -268,22 +288,30 @@ struct ChatHeadView: View {
                 .transaction { transaction in
                     transaction.animation = nil
                 }
-                .onAppear { stopStatusBlink() }
         }
     }
 
-    private func startStatusBlink() {
-        statusBlink = false
-        withAnimation(.easeInOut(duration: 0.65).repeatForever(autoreverses: true)) {
-            statusBlink = true
+    private func updateWorkingAnimation() {
+        if isWorking {
+            startWorkingAnimation()
+        } else {
+            stopWorkingAnimation()
         }
     }
 
-    private func stopStatusBlink() {
+    private func startWorkingAnimation() {
+        guard !isEmojiBobbling else { return }
+        isEmojiBobbling = false
+        withAnimation(DesignTokens.motionPlayful.speed(1.05).repeatForever(autoreverses: true)) {
+            isEmojiBobbling = true
+        }
+    }
+
+    private func stopWorkingAnimation() {
         var transaction = Transaction()
         transaction.animation = nil
         withTransaction(transaction) {
-            statusBlink = false
+            isEmojiBobbling = false
         }
     }
 }
