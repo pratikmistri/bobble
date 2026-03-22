@@ -21,11 +21,13 @@ class ChatSessionViewModel: ObservableObject {
 
     var onSessionUpdated: ((ChatSession) -> Void)?
 
-    private var processManager: CLIProcessManager?
+    private var conversationTransport: ConversationTransport?
+    private var conversationTransportBackend: CLIBackend?
     private var chatHeadSymbolProcess: CLIProcessManager?
     private var cancellables = Set<AnyCancellable>()
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
+    private var shouldRecycleCopilotTransportAfterTurn = false
 
     init(session: ChatSession) {
         self.session = session
@@ -78,102 +80,24 @@ class ChatSessionViewModel: ObservableObject {
         }
         session.cliSessionBackend = backend
 
-        let pm = CLIProcessManager(
+        let transport = transportForCurrentConversation(executablePath: path)
+        configureTransportCallbacks(transport)
+
+        let request = ConversationTurnRequest(
             backend: backend,
-            executablePath: path,
-            model: session.selectedModel.cliValue,
             prompt: buildPrompt(userPrompt: prompt, attachments: attachments),
             imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: session.cliSessionId,
             isResume: shouldResume,
-            workingDirectory: session.workspaceDirectory
+            workingDirectory: session.workspaceDirectory,
+            model: session.selectedModel.cliValue,
+            executionMode: session.conversationMode
         )
-        self.processManager = pm
-
-        pm.onTextChunk = { [weak self] text in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.applyAssistantDelta(text)
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onResult = { [weak self] text in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.completeAssistantMessage(with: text)
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onEventText = { [weak self] text in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                let kind = self.classifySystemEventKind(trimmed)
-                self.session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onComplete = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.finishAssistantRun()
-                self.processManager = nil
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onSessionId = { [weak self] newId in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if self.session.cliSessionId != newId {
-                    self.session.cliSessionId = newId
-                    self.notifyUpdate()
-                }
-            }
-        }
-
-        pm.onAssistantMessageStarted = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.startAssistantMessageIfNeeded()
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onTurnCompleted = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.finishAssistantRun()
-                self.notifyUpdate()
-            }
-        }
-
-        pm.onError = { [weak self] error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                // Remove the empty streaming message
-                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
-                    self.session.messages.remove(at: idx)
-                }
-                let errorMsg = ChatMessage(role: .error, content: error)
-                self.session.messages.append(errorMsg)
-                self.session.state = .error(error)
-                self.session.cliSessionBackend = nil
-                self.processManager = nil
-                self.notifyUpdate()
-            }
-        }
-
-        pm.start()
+        transport.sendTurn(request)
     }
 
     func terminate() {
-        processManager?.stop()
-        processManager = nil
+        resetConversationTransport()
         chatHeadSymbolProcess?.stop()
         chatHeadSymbolProcess = nil
     }
@@ -188,6 +112,41 @@ class ChatSessionViewModel: ObservableObject {
     func updateProvider(_ provider: CLIBackend) {
         guard session.provider != provider else { return }
         session.provider = provider
+        session.cliSessionId = UUID().uuidString
+        session.cliSessionBackend = nil
+        resetConversationTransport()
+        notifyUpdate()
+    }
+
+    func updateConversationMode(_ mode: ConversationExecutionMode) {
+        guard session.conversationMode != mode else { return }
+        session.conversationMode = mode
+        if case .running = session.state {
+            notifyUpdate()
+            return
+        }
+        session.cliSessionId = UUID().uuidString
+        session.cliSessionBackend = nil
+        resetConversationTransport()
+        notifyUpdate()
+    }
+
+    func handleInterruptionAction(_ action: ChatMessage.InterruptionAction) {
+        guard let payload = action.payload else { return }
+        let components = payload.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard components.count == 3 else { return }
+
+        let interruptionID = components[0]
+        let actionID = components[1]
+        let transportValue = components[2].isEmpty ? nil : components[2]
+
+        if actionID == "bypass-conversation" {
+            shouldRecycleCopilotTransportAfterTurn = true
+            session.conversationMode = .bypass
+        }
+
+        conversationTransport?.resolveInterruption(id: interruptionID, actionTransportValue: transportValue)
+        clearInterruptionActions(containing: action.id)
         notifyUpdate()
     }
 
@@ -201,6 +160,184 @@ class ChatSessionViewModel: ObservableObject {
             } catch {
                 appendAttachmentError("Couldn't attach \(url.lastPathComponent): \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func configureTransportCallbacks(_ transport: ConversationTransport) {
+        transport.onTextChunk = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.applyAssistantDelta(text)
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onResult = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.completeAssistantMessage(with: text)
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onEventText = { [weak self] text in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                let kind = self.classifySystemEventKind(trimmed)
+                self.session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onInterruption = { [weak self] interruption in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.appendInterruptionMessage(interruption)
+                if interruption.actions.isEmpty {
+                    self.finishAssistantRun()
+                }
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onComplete = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.finishAssistantRun()
+                self.handleTurnLifecycleCompletion()
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onSessionId = { [weak self] newId in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if self.session.cliSessionId != newId {
+                    self.session.cliSessionId = newId
+                    self.notifyUpdate()
+                }
+            }
+        }
+
+        transport.onAssistantMessageStarted = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.startAssistantMessageIfNeeded()
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onTurnCompleted = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.finishAssistantRun()
+                self.notifyUpdate()
+            }
+        }
+
+        transport.onError = { [weak self] error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let idx = self.session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+                    self.session.messages.remove(at: idx)
+                }
+                let errorMsg = ChatMessage(role: .error, content: error)
+                self.session.messages.append(errorMsg)
+                self.session.state = .error(error)
+                self.session.cliSessionBackend = nil
+                self.handleTurnLifecycleCompletion(forceReset: true)
+                self.notifyUpdate()
+            }
+        }
+    }
+
+    private func transportForCurrentConversation(executablePath: String) -> ConversationTransport {
+        if session.provider == .copilot,
+           let existing = conversationTransport as? CopilotACPTransport,
+           conversationTransportBackend == .copilot {
+            return existing
+        }
+
+        if session.provider != .copilot {
+            resetConversationTransport()
+            let transport = CLIConversationTransport()
+            conversationTransport = transport
+            conversationTransportBackend = session.provider
+            return transport
+        }
+
+        resetConversationTransport()
+        let transport = CopilotACPTransport(
+            executablePath: executablePath,
+            workingDirectory: session.workspaceDirectory,
+            executionMode: session.conversationMode
+        )
+        conversationTransport = transport
+        conversationTransportBackend = .copilot
+        return transport
+    }
+
+    private func resetConversationTransport() {
+        conversationTransport?.stop()
+        conversationTransport = nil
+        conversationTransportBackend = nil
+        shouldRecycleCopilotTransportAfterTurn = false
+    }
+
+    private func handleTurnLifecycleCompletion(forceReset: Bool = false) {
+        let shouldReset = forceReset
+            || conversationTransportBackend != .copilot
+            || shouldRecycleCopilotTransportAfterTurn
+
+        if shouldReset {
+            resetConversationTransport()
+        } else {
+            shouldRecycleCopilotTransportAfterTurn = false
+        }
+    }
+
+    private func appendInterruptionMessage(_ interruption: ConversationInterruption) {
+        let actions = interruption.actions.map { action in
+            ChatMessage.InterruptionAction(
+                title: action.label,
+                role: interruptionActionRole(for: action.role),
+                payload: "\(interruption.id)|\(action.id)|\(action.transportValue ?? "")"
+            )
+        }
+
+        let kind: ChatMessage.Kind = interruption.kind == .question ? .question : .permission
+        session.messages.append(
+            ChatMessage(
+                role: .system,
+                content: interruption.details,
+                interruptionTitle: interruption.title,
+                interruptionDetails: interruption.details,
+                interruptionActions: actions,
+                kind: kind
+            )
+        )
+    }
+
+    private func clearInterruptionActions(containing actionID: UUID) {
+        guard let messageIndex = session.messages.firstIndex(where: { message in
+            message.interruptionActions.contains(where: { $0.id == actionID })
+        }) else {
+            return
+        }
+
+        session.messages[messageIndex].interruptionActions = []
+    }
+
+    private func interruptionActionRole(for role: ConversationInterruption.Action.Role) -> ChatMessage.InterruptionAction.Role {
+        switch role {
+        case .primary:
+            return .primary
+        case .secondary:
+            return .secondary
+        case .destructive:
+            return .destructive
         }
     }
 
@@ -409,13 +546,23 @@ class ChatSessionViewModel: ObservableObject {
         let permissionMarkers = [
             "codex approval",
             "codex permission",
+            "claude approval",
+            "claude permission",
             "approval",
-            "permission",
-            "request user input",
-            "user input"
+            "permission"
         ]
         if permissionMarkers.contains(where: normalized.contains) {
             return .permission
+        }
+
+        let questionMarkers = [
+            "request user input",
+            "user input",
+            "question",
+            "sendusermessage"
+        ]
+        if questionMarkers.contains(where: normalized.contains) {
+            return .question
         }
 
         let thoughtMarkers = [
@@ -593,7 +740,8 @@ class ChatSessionViewModel: ObservableObject {
             imagePaths: attachments.filter(\.isImage).map(\.filePath),
             sessionId: UUID().uuidString,
             isResume: false,
-            workingDirectory: session.workspaceDirectory
+            workingDirectory: session.workspaceDirectory,
+            launchPurpose: .helperAutonomous
         )
 
         process.onTextChunk = { text in

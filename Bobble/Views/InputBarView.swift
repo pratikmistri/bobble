@@ -13,6 +13,13 @@ struct InputBarView: View {
             || !viewModel.pendingAttachments.isEmpty
     }
 
+    private var isConversationRunning: Bool {
+        if case .running = viewModel.session.state {
+            return true
+        }
+        return false
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !viewModel.pendingAttachments.isEmpty {
@@ -75,6 +82,13 @@ struct InputBarView: View {
                     } else if showProviderBadge {
                         ProviderBadgeView(provider: viewModel.session.provider)
                             .help("Switch providers from the menu bar icon")
+                    }
+
+                    ConversationModeMenu(
+                        selectedMode: viewModel.session.conversationMode,
+                        isDisabled: isConversationRunning
+                    ) { mode in
+                        viewModel.updateConversationMode(mode)
                     }
                 }
 
@@ -218,5 +232,58 @@ struct ModelPickerMenu: View {
         }
         .menuStyle(.borderlessButton)
         .help("Choose the Codex model for the next message")
+    }
+}
+
+struct ConversationModeMenu: View {
+    let selectedMode: ConversationExecutionMode
+    let isDisabled: Bool
+    let onSelect: (ConversationExecutionMode) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(ConversationExecutionMode.allCases) { mode in
+                Button(action: { onSelect(mode) }) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(mode.displayName)
+                            Text(mode.helpText)
+                                .font(.system(size: 11))
+                                .foregroundColor(DesignTokens.textSecondary)
+                        }
+
+                        if mode == selectedMode {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: selectedMode == .ask ? "questionmark.circle" : "bolt.shield")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(selectedMode.displayName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundColor(DesignTokens.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(DesignTokens.surfaceAccent.opacity(0.32))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.55 : 1.0)
+        .help(isDisabled ? "Mode changes apply after the current turn finishes" : "Choose Ask or Bypass for this conversation")
     }
 }

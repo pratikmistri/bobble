@@ -27,6 +27,8 @@
 		A10000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000018 /* Assets.xcassets */; };
 		A10000019 /* BobbleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021 /* BobbleRootView.swift */; };
 		A10000020 /* FloatingControlCircle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022 /* FloatingControlCircle.swift */; };
+		A10000021 /* ConversationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000023 /* ConversationTransport.swift */; };
+		A10000022 /* CopilotACPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000024 /* CopilotACPTransport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,6 +54,8 @@
 		B10000020 /* Bobble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bobble.entitlements; sourceTree = "<group>"; };
 		B10000021 /* BobbleRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BobbleRootView.swift; sourceTree = "<group>"; };
 		B10000022 /* FloatingControlCircle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingControlCircle.swift; sourceTree = "<group>"; };
+		B10000023 /* ConversationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationTransport.swift; sourceTree = "<group>"; };
+		B10000024 /* CopilotACPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotACPTransport.swift; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -116,6 +120,8 @@
 			children = (
 				B10000011 /* CLIProcessManager.swift */,
 				B10000012 /* StreamParser.swift */,
+				B10000023 /* ConversationTransport.swift */,
+				B10000024 /* CopilotACPTransport.swift */,
 			);
 			path = Process;
 			sourceTree = "<group>";
@@ -250,6 +256,8 @@
 				A10000017 /* InputBarView.swift in Sources */,
 				A10000019 /* BobbleRootView.swift in Sources */,
 				A10000020 /* FloatingControlCircle.swift in Sources */,
+				A10000021 /* ConversationTransport.swift in Sources */,
+				A10000022 /* CopilotACPTransport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,10 +5,21 @@ import SwiftUI
 struct MessageBubbleView: View {
     let message: ChatMessage
     let index: Int
+    let onInterruptionAction: ((ChatMessage.InterruptionAction) -> Void)?
 
     @State private var appeared = false
     @State private var cursorVisible = true
     @State private var isExpanded = false
+
+    init(
+        message: ChatMessage,
+        index: Int,
+        onInterruptionAction: ((ChatMessage.InterruptionAction) -> Void)? = nil
+    ) {
+        self.message = message
+        self.index = index
+        self.onInterruptionAction = onInterruptionAction
+    }
 
     var body: some View {
         HStack {
@@ -113,7 +124,9 @@ struct MessageBubbleView: View {
         case .assistant:
             return DesignTokens.assistantBubbleColor
         case .system:
-            return DesignTokens.surfaceAccent.opacity(0.5)
+            return message.isInterruptionCard
+                ? DesignTokens.surfaceAccent.opacity(0.28)
+                : DesignTokens.surfaceAccent.opacity(0.5)
         case .error:
             return Color.red.opacity(0.15)
         }
@@ -126,7 +139,7 @@ struct MessageBubbleView: View {
         case .assistant:
             return DesignTokens.textPrimary
         case .system:
-            return DesignTokens.textSecondary
+            return message.isInterruptionCard ? DesignTokens.textPrimary : DesignTokens.textSecondary
         case .error:
             return .red
         }
@@ -134,7 +147,9 @@ struct MessageBubbleView: View {
 
     @ViewBuilder
     private var messageContent: some View {
-        if shouldShowTypingIndicator {
+        if message.isInterruptionCard {
+            interruptionCardContent
+        } else if shouldShowTypingIndicator {
             TypingIndicatorDotsView(dotColor: foregroundColor)
         } else if shouldUsePlainText {
             bubbleText
@@ -144,6 +159,113 @@ struct MessageBubbleView: View {
         } else {
             MarkdownMessageView(markdown: message.content)
         }
+    }
+
+    private var interruptionCardTitle: String {
+        message.interruptionCardTitle ?? "Update"
+    }
+
+    private var interruptionCardIconName: String {
+        switch message.kind {
+        case .permission:
+            return "shield.lefthalf.filled"
+        case .question:
+            return "questionmark.circle.fill"
+        case .regular, .agentThought, .toolUse:
+            return "exclamationmark.bubble.fill"
+        }
+    }
+
+    private var interruptionCardAccentColor: Color {
+        switch message.kind {
+        case .permission:
+            return DesignTokens.surfaceAccent
+        case .question:
+            return DesignTokens.textSecondary
+        case .regular, .agentThought, .toolUse:
+            return DesignTokens.surfaceAccent
+        }
+    }
+
+    @ViewBuilder
+    private var interruptionCardContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: interruptionCardIconName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(interruptionCardAccentColor)
+                    .frame(width: 18, height: 18)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(interruptionCardTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(DesignTokens.textPrimary)
+
+                    Text(message.interruptionCardBody)
+                        .font(DesignTokens.messageFont)
+                        .foregroundColor(DesignTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if !message.interruptionActions.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(message.interruptionActions) { action in
+                        Button(action: {
+                            onInterruptionAction?(action)
+                        }) {
+                            Text(action.title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .foregroundColor(actionForegroundColor(for: action))
+                                .background(actionBackground(for: action))
+                                .overlay(actionBorder(for: action))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(onInterruptionAction == nil)
+                        .opacity(onInterruptionAction == nil ? 0.55 : 1)
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
+    }
+
+    private func actionForegroundColor(for action: ChatMessage.InterruptionAction) -> Color {
+        switch action.role {
+        case .primary:
+            return DesignTokens.textPrimary
+        case .secondary:
+            return DesignTokens.textSecondary
+        case .destructive:
+            return .red
+        }
+    }
+
+    @ViewBuilder
+    private func actionBackground(for action: ChatMessage.InterruptionAction) -> some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(
+                action.role == .primary
+                    ? DesignTokens.surfaceAccent.opacity(0.55)
+                    : Color.clear
+            )
+    }
+
+    @ViewBuilder
+    private func actionBorder(for action: ChatMessage.InterruptionAction) -> some View {
+        RoundedRectangle(cornerRadius: 999, style: .continuous)
+            .stroke(
+                action.role == .primary ? Color.clear : DesignTokens.borderColor.opacity(0.85),
+                lineWidth: 1
+            )
     }
 
     private var bubbleText: Text {

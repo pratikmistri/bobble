@@ -84,7 +84,16 @@ class StreamParser {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             // Not JSON — could be plain text output, treat as text
             if let text = String(data: data, encoding: .utf8) {
-                onTextDelta?(text)
+                let normalized = text.lowercased()
+                if normalized.contains("permission")
+                    || normalized.contains("approval")
+                    || normalized.contains("question")
+                    || normalized.contains("user input")
+                    || normalized.contains("sendusermessage") {
+                    onEventText?(text)
+                } else {
+                    onTextDelta?(text)
+                }
             }
             return
         }
@@ -92,6 +101,18 @@ class StreamParser {
         guard let type = json["type"] as? String else {
             if let result = json["result"] as? String {
                 onResult?(result)
+            }
+            return
+        }
+
+        let normalizedType = type.lowercased()
+        if normalizedType.contains("permission")
+            || normalizedType.contains("approval")
+            || normalizedType.contains("question")
+            || normalizedType.contains("user_input")
+            || normalizedType.contains("sendusermessage") {
+            if let rendered = renderClaudeEvent(type: type, payload: json) {
+                onEventText?(rendered)
             }
             return
         }
@@ -141,6 +162,17 @@ class StreamParser {
         default:
             break
         }
+    }
+
+    private func renderClaudeEvent(type: String, payload: [String: Any]) -> String? {
+        let title = "Claude \(humanize(type))"
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+           let details = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !details.isEmpty {
+            return "\(title)\nDetails:\n\(details)"
+        }
+        return title
     }
 
     private func processCodexLine(_ data: Data) {

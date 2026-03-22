@@ -31,6 +31,28 @@ struct ChatContentView: View {
         return activeStreamingAssistantMessage == nil
     }
 
+    private var bottomScrollTarget: AnyHashable? {
+        if shouldShowTypingIndicatorPlaceholder {
+            return AnyHashable(typingIndicatorID)
+        }
+
+        return chronologicalMessages.last.map { AnyHashable($0.id) }
+    }
+
+    private func scrollToBottom(using proxy: ScrollViewProxy, animated: Bool) {
+        guard let target = bottomScrollTarget else { return }
+
+        DispatchQueue.main.async {
+            if animated {
+                withAnimation(DesignTokens.motionScroll) {
+                    proxy.scrollTo(target, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(target, anchor: .bottom)
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -81,7 +103,13 @@ struct ChatContentView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(chronologicalMessages.enumerated()), id: \.element.id) { index, message in
-                            MessageBubbleView(message: message, index: index)
+                            MessageBubbleView(
+                                message: message,
+                                index: index,
+                                onInterruptionAction: { action in
+                                    viewModel.handleInterruptionAction(action)
+                                }
+                            )
                                 .id(message.id)
                         }
 
@@ -92,18 +120,18 @@ struct ChatContentView: View {
                     }
                     .padding(12)
                 }
+                .onAppear {
+                    scrollToBottom(using: proxy, animated: false)
+                }
+                .onChange(of: session.id) {
+                    scrollToBottom(using: proxy, animated: false)
+                }
                 .onChange(of: viewModel.session.messages.count) {
-                    if let lastId = chronologicalMessages.last?.id {
-                        withAnimation(DesignTokens.motionScroll) {
-                            proxy.scrollTo(lastId, anchor: .bottom)
-                        }
-                    }
+                    scrollToBottom(using: proxy, animated: true)
                 }
                 .onChange(of: shouldShowTypingIndicatorPlaceholder) {
                     guard shouldShowTypingIndicatorPlaceholder else { return }
-                    withAnimation(DesignTokens.motionScroll) {
-                        proxy.scrollTo(typingIndicatorID, anchor: .bottom)
-                    }
+                    scrollToBottom(using: proxy, animated: true)
                 }
             }
             .opacity(contentAppeared ? 1 : 0)

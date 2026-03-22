@@ -1,6 +1,11 @@
 import Foundation
 
-class CLIProcessManager {
+enum CLIProcessLaunchPurpose {
+    case conversation(ConversationExecutionMode)
+    case helperAutonomous
+}
+
+final class CLIProcessManager {
     private var process: Process?
     private let backend: CLIBackend
     private let executablePath: String
@@ -12,6 +17,7 @@ class CLIProcessManager {
     private let workingDirectory: String
     private let parser: StreamParser
     private let usesStdinPrompt: Bool
+    private let launchPurpose: CLIProcessLaunchPurpose
 
     var onTextChunk: ((String) -> Void)?
     var onResult: ((String) -> Void)?
@@ -30,7 +36,8 @@ class CLIProcessManager {
         imagePaths: [String],
         sessionId: String,
         isResume: Bool,
-        workingDirectory: String
+        workingDirectory: String,
+        launchPurpose: CLIProcessLaunchPurpose = .conversation(.bypass)
     ) {
         self.backend = backend
         self.executablePath = executablePath
@@ -42,6 +49,7 @@ class CLIProcessManager {
         self.workingDirectory = workingDirectory
         self.parser = StreamParser(backend: backend)
         self.usesStdinPrompt = backend == .codex
+        self.launchPurpose = launchPurpose
     }
 
     func start() {
@@ -60,11 +68,8 @@ class CLIProcessManager {
 
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
+        process.arguments = makeArguments()
 
-        let args = makeArguments()
-        process.arguments = args
-
-        // Inherit user's PATH so installed CLIs can find their dependencies.
         var env = ProcessInfo.processInfo.environment
         if let path = env["PATH"] {
             env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:\(path)"
@@ -85,37 +90,29 @@ class CLIProcessManager {
         parser.onTextDelta = { [weak self] text in
             self?.onTextChunk?(text)
         }
-
         parser.onResult = { [weak self] text in
             self?.onResult?(text)
         }
-
         parser.onEventText = { [weak self] text in
             self?.onEventText?(text)
         }
-
         parser.onSessionId = { [weak self] id in
             self?.onSessionId?(id)
         }
-
         parser.onAssistantMessageStarted = { [weak self] in
             self?.onAssistantMessageStarted?()
         }
-
         parser.onTurnCompleted = { [weak self] in
             self?.onTurnCompleted?()
         }
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            if data.isEmpty {
-                return
-            }
+            guard !data.isEmpty else { return }
             self?.parser.feed(data)
         }
 
         process.terminationHandler = { [weak self] proc in
-            // Give a moment for final data to flush
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 self?.parser.finish()
@@ -142,7 +139,7 @@ class CLIProcessManager {
     }
 
     func stop() {
-        if let process = process, process.isRunning {
+        if let process, process.isRunning {
             process.terminate()
         }
         process = nil
@@ -151,6 +148,14 @@ class CLIProcessManager {
     private func makeArguments() -> [String] {
         let imageArguments = imagePaths.flatMap { ["--image", $0] }
         let modelArguments = model.map { ["--model", $0] } ?? []
+        let executionMode: ConversationExecutionMode = {
+            switch launchPurpose {
+            case .conversation(let mode):
+                return mode
+            case .helperAutonomous:
+                return .bypass
+            }
+        }()
 
         switch backend {
         case .claude:
@@ -159,6 +164,13 @@ class CLIProcessManager {
                 "--output-format", "stream-json",
                 "--verbose"
             ]
+
+            if executionMode == .ask, case .conversation = launchPurpose {
+                args += ["--permission-mode", "default", "--brief"]
+            } else {
+                args += ["--permission-mode", "bypassPermissions"]
+            }
+
             if isResume {
                 args += ["--resume", sessionId]
             } else {
@@ -167,37 +179,49 @@ class CLIProcessManager {
             return args
 
         case .copilot:
-            return [
+            var args = [
                 "--prompt", prompt,
-                "--silent",
-                "--no-ask-user",
-                "--allow-all-tools"
-            ] + modelArguments
+                "--silent"
+            ]
+            if executionMode == .bypass {
+                args += ["--no-ask-user", "--allow-all"]
+            }
+            return args + modelArguments
 
         case .codex:
+            let approvalArguments: [String]
+            if executionMode == .ask {
+                approvalArguments = [
+                    "-c", "approval_policy=\"untrusted\"",
+                    "--sandbox", "danger-full-access"
+                ]
+            } else {
+                approvalArguments = [
+                    "--dangerously-bypass-approvals-and-sandbox"
+                ]
+            }
+
             if isResume {
                 return [
                     "exec",
-                    "resume",
+                    "resume"
                 ] + modelArguments + [
                     "--json",
-                    "--skip-git-repo-check",
-                    "--dangerously-bypass-approvals-and-sandbox",
-                ] + imageArguments + [
+                    "--skip-git-repo-check"
+                ] + approvalArguments + imageArguments + [
                     sessionId,
                     "-"
                 ]
             }
 
             return [
-                "exec",
+                "exec"
             ] + modelArguments + [
                 "--json",
                 "--skip-git-repo-check",
-                "--dangerously-bypass-approvals-and-sandbox",
                 "--cd",
-                workingDirectory,
-            ] + imageArguments + [
+                workingDirectory
+            ] + approvalArguments + imageArguments + [
                 "-"
             ]
         }
