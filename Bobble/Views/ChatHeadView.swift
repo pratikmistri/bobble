@@ -16,7 +16,7 @@ struct ChatHeadView: View {
     @State private var isShowingPreview = false
     @State private var isEmojiBobbling = false
     @State private var previewTask: Task<Void, Never>?
-    private let controlShellDiameter: CGFloat = DesignTokens.headDiameter + 8
+    private let controlShellDiameter: CGFloat = DesignTokens.headControlDiameter
 
     var body: some View {
         let isHighlighted = isHovering || isDropTargeted

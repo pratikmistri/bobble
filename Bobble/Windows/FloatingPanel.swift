@@ -20,10 +20,13 @@ class FloatingPanel: NSPanel {
         animationBehavior = .none
         isReleasedWhenClosed = false
 
-        let hostingController = NSHostingController(rootView: contentView)
-        hostingController.view.frame = NSRect(origin: .zero, size: size)
-        hostingController.view.autoresizingMask = [.width, .height]
-        contentViewController = hostingController
+        let hostingView = NSHostingView(rootView: contentView)
+        if #available(macOS 13.0, *) {
+            hostingView.sizingOptions = []
+        }
+        hostingView.frame = NSRect(origin: .zero, size: size)
+        hostingView.autoresizingMask = [.width, .height]
+        self.contentView = hostingView
     }
 
     override var canBecomeKey: Bool { true }

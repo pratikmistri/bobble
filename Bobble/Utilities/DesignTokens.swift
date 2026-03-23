@@ -6,6 +6,7 @@ import AppKit
 enum DesignTokens {
     // Sizes
     static let headDiameter: CGFloat = 50
+    static let headControlDiameter: CGFloat = headDiameter + 8
     static let headSpacing: CGFloat = 8
     static let headInset: CGFloat = 14 // extra space around heads for hover scale, shadows, indicators
     static let headVisualPadding: CGFloat = 8 // extra per-head render room for blur/shadow

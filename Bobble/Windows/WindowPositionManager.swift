@@ -18,14 +18,21 @@ struct WindowPositionManager {
     // MARK: - Collapsed state (just heads)
 
     func collapsedPanelSize(count: Int) -> NSSize {
-        let controlRows = 2 // add + history
-        let totalRows = count + controlRows
         let inset = DesignTokens.headInset * 2
-        let stackVisualOverflow = count > 0 ? headVisualPadding : 0
-        let height = CGFloat(totalRows) * headDiameter
-            + CGFloat(max(totalRows - 1, 0)) * headSpacing
-            + stackVisualOverflow
+        let addControlHeight = headDiameter
+        let historyControlHeight = headDiameter
+        let headStackHeight = collapsedHeadStackHeight(for: count)
+
+        var rows: [CGFloat] = [addControlHeight, historyControlHeight]
+        if headStackHeight > 0 {
+            rows.append(headStackHeight)
+        }
+
+        let height = rows.reduce(0, +)
+            + CGFloat(max(rows.count - 1, 0)) * headSpacing
             + inset
+
+        let stackVisualOverflow = count > 0 ? headVisualPadding : 0
         let visibleWidth = headDiameter + stackVisualOverflow
         return NSSize(
             width: visibleWidth + inset + DesignTokens.headPreviewOverflow,
@@ -72,6 +79,12 @@ struct WindowPositionManager {
     private func deckStackHeight(for count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return headDiameter + (CGFloat(count - 1) * DesignTokens.deckOffset) + headVisualPadding
+    }
+
+    private func collapsedHeadStackHeight(for count: Int) -> CGFloat {
+        guard count > 0 else { return 0 }
+        return DesignTokens.headControlDiameter * CGFloat(count)
+            + CGFloat(count - 1) * headSpacing
     }
 
     // MARK: - Panel anchor and origin

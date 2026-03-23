@@ -48,9 +48,9 @@ struct BobbleRootView: View {
     private var collapsedHeadsRenderHeight: CGFloat {
         let count = manager.sessions.count
         guard count > 0 else { return 0 }
-        let collapsedFrameHeight = CGFloat(count) * DesignTokens.headDiameter
+        let collapsedFrameHeight = CGFloat(count) * DesignTokens.headControlDiameter
             + CGFloat(count - 1) * DesignTokens.headSpacing
-        return collapsedFrameHeight + headVisualPadding
+        return collapsedFrameHeight
     }
 
     private var headsRenderWidth: CGFloat {
@@ -71,7 +71,7 @@ struct BobbleRootView: View {
     }
 
     private func collapsedHeadYOffset(for index: Int) -> CGFloat {
-        CGFloat(index) * (DesignTokens.headDiameter + DesignTokens.headSpacing)
+        CGFloat(index) * (DesignTokens.headControlDiameter + DesignTokens.headSpacing)
     }
 
     private func cardStackHeight(for count: Int) -> CGFloat {
