@@ -8,6 +8,7 @@ DerivedData/
 # macOS
 .DS_Store
 agents.md
+learnings.md
 
 # Swift Package Manager
 .build/
