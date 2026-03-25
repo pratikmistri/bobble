@@ -89,7 +89,12 @@ class ChatHeadsManager: ObservableObject {
     }
 
     func addSession() {
-        let session = ChatSession(provider: selectedProvider)
+        let imageName = nextChatHeadImageName(existingSessions: sessions + historySessions)
+        let session = ChatSession(
+            chatHeadSymbol: imageName,
+            hasAssignedChatHeadSymbol: true,
+            provider: selectedProvider
+        )
         sessions.append(session)
         configureViewModel(for: session)
 
@@ -229,13 +234,19 @@ class ChatHeadsManager: ObservableObject {
     }
 
     private func restoreSessions() {
-        let restored = historyStore.load().map { $0.normalizedForRestore() }
+        var restored = historyStore.load().map { $0.normalizedForRestore() }
+        let didAssignMissingChatHeads = assignMissingChatHeadsIfNeeded(in: &restored)
+
         sessions = restored
             .filter { !$0.isArchived }
             .sorted { $0.updatedAt < $1.updatedAt }
         historySessions = restored
             .filter { $0.isArchived }
             .sorted { $0.updatedAt > $1.updatedAt }
+
+        if didAssignMissingChatHeads {
+            historyStore.save(activeSessions: sessions, historySessions: historySessions)
+        }
 
         for session in sessions {
             configureViewModel(for: session)
@@ -281,6 +292,49 @@ class ChatHeadsManager: ObservableObject {
         DispatchQueue.global(qos: .utility).async {
             store.save(activeSessions: activeSessions, historySessions: archivedSessions)
         }
+    }
+
+    private func assignMissingChatHeadsIfNeeded(in restoredSessions: inout [ChatSession]) -> Bool {
+        var didAssign = false
+        var usageCounts = emptyChatHeadUsageCounts()
+
+        for session in restoredSessions where session.hasAssignedChatHeadSymbol {
+            usageCounts[session.chatHeadImageName, default: 0] += 1
+        }
+
+        for index in restoredSessions.indices where !restoredSessions[index].hasAssignedChatHeadSymbol {
+            let imageName = nextChatHeadImageName(usageCounts: usageCounts)
+            restoredSessions[index].chatHeadSymbol = imageName
+            restoredSessions[index].hasAssignedChatHeadSymbol = true
+            usageCounts[imageName, default: 0] += 1
+            didAssign = true
+        }
+
+        return didAssign
+    }
+
+    private func nextChatHeadImageName(existingSessions: [ChatSession]) -> String {
+        var usageCounts = emptyChatHeadUsageCounts()
+        for session in existingSessions {
+            usageCounts[session.chatHeadImageName, default: 0] += 1
+        }
+        return nextChatHeadImageName(usageCounts: usageCounts)
+    }
+
+    private func nextChatHeadImageName(usageCounts: [String: Int]) -> String {
+        for imageName in ChatSession.availableChatHeadImageNames where usageCounts[imageName, default: 0] == 0 {
+            return imageName
+        }
+
+        let minimumUsage = usageCounts.values.min() ?? 0
+        return ChatSession.availableChatHeadImageNames.first(where: { usageCounts[$0, default: 0] == minimumUsage })
+            ?? ChatSession.defaultChatHeadSymbol
+    }
+
+    private func emptyChatHeadUsageCounts() -> [String: Int] {
+        Dictionary(
+            uniqueKeysWithValues: ChatSession.availableChatHeadImageNames.map { ($0, 0) }
+        )
     }
 
     private func deleteWorkspace(for session: ChatSession) {
