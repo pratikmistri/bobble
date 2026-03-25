@@ -139,38 +139,11 @@ enum ProviderModelOption: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 
     static func availableOptions(for provider: CLIBackend) -> [ProviderModelOption] {
-        switch provider {
-        case .codex:
-            return [
-                .automatic,
-                .gpt5Codex,
-                .gpt53Codex,
-                .gpt52Codex,
-                .gpt51Codex,
-                .gpt51CodexMax,
-                .gpt51CodexMini
-            ]
-        case .claude:
-            return [
-                .automatic,
-                .claudeSonnet46,
-                .claudeOpus46,
-                .claudeHaiku45
-            ]
-        case .copilot:
-            return [
-                .automatic,
-                .copilotClaudeSonnet45,
-                .copilotClaudeOpus45,
-                .copilotClaudeOpus46,
-                .copilotGPT51CodexMax,
-                .copilotGPT52Codex
-            ]
-        }
+        allCases.filter { $0.metadata.availableProviders.contains(provider) }
     }
 
     func isAvailable(for provider: CLIBackend) -> Bool {
-        Self.availableOptions(for: provider).contains(self)
+        metadata.availableProviders.contains(provider)
     }
 
     func normalized(for provider: CLIBackend) -> ProviderModelOption {
@@ -183,114 +156,141 @@ enum ProviderModelOption: String, CaseIterable, Identifiable, Codable {
     }
 
     func displayName(for provider: CLIBackend) -> String {
-        switch self {
-        case .automatic:
-            return "Auto"
-        case .gpt5Codex:
-            return "GPT-5 Codex"
-        case .gpt53Codex:
-            return "GPT-5.3 Codex"
-        case .gpt52Codex:
-            return "GPT-5.2 Codex"
-        case .gpt51Codex:
-            return "GPT-5.1 Codex"
-        case .gpt51CodexMax:
-            return "GPT-5.1 Codex Max"
-        case .gpt51CodexMini:
-            return "GPT-5.1 Codex Mini"
-        case .claudeSonnet46:
-            return "Claude Sonnet 4.6"
-        case .claudeOpus46:
-            return "Claude Opus 4.6"
-        case .claudeHaiku45:
-            return "Claude Haiku 4.5"
-        case .copilotClaudeSonnet45:
-            return "Claude Sonnet 4.5"
-        case .copilotClaudeOpus45:
-            return "Claude Opus 4.5"
-        case .copilotClaudeOpus46:
-            return "Claude Opus 4.6"
-        case .copilotGPT51CodexMax:
-            return "GPT-5.1 Codex Max"
-        case .copilotGPT52Codex:
-            return "GPT-5.2 Codex"
-        }
+        metadata.displayName
     }
 
     func shortLabel(for provider: CLIBackend) -> String {
-        switch self {
-        case .automatic:
-            return "Auto"
-        case .gpt5Codex:
-            return "5 Codex"
-        case .gpt53Codex:
-            return "5.3 Codex"
-        case .gpt52Codex:
-            return "5.2 Codex"
-        case .gpt51Codex:
-            return "5.1 Codex"
-        case .gpt51CodexMax:
-            return "5.1 Max"
-        case .gpt51CodexMini:
-            return "5.1 Mini"
-        case .claudeSonnet46:
-            return "Sonnet 4.6"
-        case .claudeOpus46:
-            return "Opus 4.6"
-        case .claudeHaiku45:
-            return "Haiku 4.5"
-        case .copilotClaudeSonnet45:
-            return "Sonnet 4.5"
-        case .copilotClaudeOpus45:
-            return "Opus 4.5"
-        case .copilotClaudeOpus46:
-            return "Opus 4.6"
-        case .copilotGPT51CodexMax:
-            return "5.1 Max"
-        case .copilotGPT52Codex:
-            return "5.2 Codex"
-        }
+        metadata.shortLabel
     }
 
     func subtitle(for provider: CLIBackend) -> String {
+        metadata.subtitle.text(for: provider)
+    }
+}
+
+private struct ProviderModelMetadata {
+    let availableProviders: Set<CLIBackend>
+    let displayName: String
+    let shortLabel: String
+    let subtitle: ProviderModelSubtitle
+}
+
+private enum ProviderModelSubtitle {
+    case fixed(String)
+    case byProvider([CLIBackend: String])
+
+    func text(for provider: CLIBackend) -> String {
         switch self {
-        case .automatic:
-            switch provider {
-            case .codex:
-                return "Use the Codex CLI default model."
-            case .claude:
-                return "Use Claude Code's default model."
-            case .copilot:
-                return "Use GitHub Copilot's default model."
-            }
-        case .gpt5Codex:
-            return "General-purpose Codex-optimized coding model."
-        case .gpt53Codex:
-            return "Most capable current Codex model."
-        case .gpt52Codex:
-            return "Strong long-horizon coding model."
-        case .gpt51Codex:
-            return "Balanced GPT-5.1 coding model."
-        case .gpt51CodexMax:
-            return "GPT-5.1 Codex variant for longer-running tasks."
-        case .gpt51CodexMini:
-            return "Smaller, cheaper GPT-5.1 Codex variant."
-        case .claudeSonnet46:
-            return "Balanced Claude model for most coding tasks."
-        case .claudeOpus46:
-            return "Most capable Claude model for harder tasks."
-        case .claudeHaiku45:
-            return "Fast Claude model for lighter requests."
-        case .copilotClaudeSonnet45:
-            return "Balanced Copilot coding-agent model."
-        case .copilotClaudeOpus45:
-            return "Stronger Anthropic model available in Copilot."
-        case .copilotClaudeOpus46:
-            return "Most capable Anthropic option currently listed for Copilot."
-        case .copilotGPT51CodexMax:
-            return "OpenAI Codex model for deeper coding tasks."
-        case .copilotGPT52Codex:
-            return "Newer Codex option available through Copilot."
+        case .fixed(let value):
+            return value
+        case .byProvider(let values):
+            return values[provider] ?? ""
         }
     }
+}
+
+private extension ProviderModelOption {
+    var metadata: ProviderModelMetadata {
+        guard let metadata = Self.catalog[self] else {
+            fatalError("Missing provider model metadata for \(self.rawValue)")
+        }
+        return metadata
+    }
+
+    static let catalog: [ProviderModelOption: ProviderModelMetadata] = [
+        .automatic: ProviderModelMetadata(
+            availableProviders: Set(CLIBackend.allCases),
+            displayName: "Auto",
+            shortLabel: "Auto",
+            subtitle: .byProvider([
+                .codex: "Use the Codex CLI default model.",
+                .claude: "Use Claude Code's default model.",
+                .copilot: "Use GitHub Copilot's default model."
+            ])
+        ),
+        .gpt5Codex: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5 Codex",
+            shortLabel: "5 Codex",
+            subtitle: .fixed("General-purpose Codex-optimized coding model.")
+        ),
+        .gpt53Codex: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5.3 Codex",
+            shortLabel: "5.3 Codex",
+            subtitle: .fixed("Most capable current Codex model.")
+        ),
+        .gpt52Codex: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5.2 Codex",
+            shortLabel: "5.2 Codex",
+            subtitle: .fixed("Strong long-horizon coding model.")
+        ),
+        .gpt51Codex: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5.1 Codex",
+            shortLabel: "5.1 Codex",
+            subtitle: .fixed("Balanced GPT-5.1 coding model.")
+        ),
+        .gpt51CodexMax: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5.1 Codex Max",
+            shortLabel: "5.1 Max",
+            subtitle: .fixed("GPT-5.1 Codex variant for longer-running tasks.")
+        ),
+        .gpt51CodexMini: ProviderModelMetadata(
+            availableProviders: [.codex],
+            displayName: "GPT-5.1 Codex Mini",
+            shortLabel: "5.1 Mini",
+            subtitle: .fixed("Smaller, cheaper GPT-5.1 Codex variant.")
+        ),
+        .claudeSonnet46: ProviderModelMetadata(
+            availableProviders: [.claude],
+            displayName: "Claude Sonnet 4.6",
+            shortLabel: "Sonnet 4.6",
+            subtitle: .fixed("Balanced Claude model for most coding tasks.")
+        ),
+        .claudeOpus46: ProviderModelMetadata(
+            availableProviders: [.claude],
+            displayName: "Claude Opus 4.6",
+            shortLabel: "Opus 4.6",
+            subtitle: .fixed("Most capable Claude model for harder tasks.")
+        ),
+        .claudeHaiku45: ProviderModelMetadata(
+            availableProviders: [.claude],
+            displayName: "Claude Haiku 4.5",
+            shortLabel: "Haiku 4.5",
+            subtitle: .fixed("Fast Claude model for lighter requests.")
+        ),
+        .copilotClaudeSonnet45: ProviderModelMetadata(
+            availableProviders: [.copilot],
+            displayName: "Claude Sonnet 4.5",
+            shortLabel: "Sonnet 4.5",
+            subtitle: .fixed("Balanced Copilot coding-agent model.")
+        ),
+        .copilotClaudeOpus45: ProviderModelMetadata(
+            availableProviders: [.copilot],
+            displayName: "Claude Opus 4.5",
+            shortLabel: "Opus 4.5",
+            subtitle: .fixed("Stronger Anthropic model available in Copilot.")
+        ),
+        .copilotClaudeOpus46: ProviderModelMetadata(
+            availableProviders: [.copilot],
+            displayName: "Claude Opus 4.6",
+            shortLabel: "Opus 4.6",
+            subtitle: .fixed("Most capable Anthropic option currently listed for Copilot.")
+        ),
+        .copilotGPT51CodexMax: ProviderModelMetadata(
+            availableProviders: [.copilot],
+            displayName: "GPT-5.1 Codex Max",
+            shortLabel: "5.1 Max",
+            subtitle: .fixed("OpenAI Codex model for deeper coding tasks.")
+        ),
+        .copilotGPT52Codex: ProviderModelMetadata(
+            availableProviders: [.copilot],
+            displayName: "GPT-5.2 Codex",
+            shortLabel: "5.2 Codex",
+            subtitle: .fixed("Newer Codex option available through Copilot.")
+        ),
+    ]
 }

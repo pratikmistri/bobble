@@ -449,7 +449,7 @@ private extension ChatSession {
             if !trimmed.isEmpty {
                 return trimmed.replacingOccurrences(of: "\n", with: " ")
             }
-            return message.attachments.isEmpty ? "No messages yet." : attachmentPreview(for: message.attachments)
+            return message.attachments.isEmpty ? "No messages yet." : AttachmentSummaryFormatter.summary(for: message.attachments)
         }
 
         if case .error(let message) = state {
@@ -457,20 +457,5 @@ private extension ChatSession {
         }
 
         return "No messages yet."
-    }
-
-    private func attachmentPreview(for attachments: [ChatAttachment]) -> String {
-        let imageCount = attachments.filter(\.isImage).count
-        let fileCount = attachments.count - imageCount
-
-        if imageCount > 0 && fileCount > 0 {
-            return "Shared \(imageCount) image\(imageCount == 1 ? "" : "s") and \(fileCount) file\(fileCount == 1 ? "" : "s")."
-        }
-
-        if imageCount > 0 {
-            return "Shared \(imageCount) image\(imageCount == 1 ? "" : "s")."
-        }
-
-        return "Shared \(fileCount) file\(fileCount == 1 ? "" : "s")."
     }
 }

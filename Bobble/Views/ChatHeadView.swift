@@ -165,65 +165,9 @@ struct ChatHeadView: View {
     }
 
     private var previewContent: ChatHeadPreviewContent? {
-        if let message = session.messages.reversed().first(where: shouldIncludeInPreview(_:)) {
-            let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !trimmed.isEmpty {
-                return ChatHeadPreviewContent(
-                    senderLabel: senderLabel(for: message),
-                    message: trimmed.replacingOccurrences(of: "\n", with: " ")
-                )
-            }
-
-            if !message.attachments.isEmpty {
-                return ChatHeadPreviewContent(
-                    senderLabel: senderLabel(for: message),
-                    message: attachmentSummary(for: message)
-                )
-            }
+        ChatHeadPreviewFormatter.preview(for: session).map {
+            ChatHeadPreviewContent(senderLabel: $0.senderLabel, message: $0.message)
         }
-
-        if case .running = session.state {
-            return ChatHeadPreviewContent(
-                senderLabel: "Live",
-                message: "Working on your latest message..."
-            )
-        }
-
-        return nil
-    }
-
-    private func shouldIncludeInPreview(_ message: ChatMessage) -> Bool {
-        guard message.role != .system else { return false }
-        return !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !message.attachments.isEmpty
-    }
-
-    private func senderLabel(for message: ChatMessage) -> String {
-        switch message.role {
-        case .user:
-            return "You"
-        case .assistant:
-            return "Assistant"
-        case .error:
-            return "Issue"
-        case .system:
-            return "System"
-        }
-    }
-
-    private func attachmentSummary(for message: ChatMessage) -> String {
-        let imageCount = message.attachments.filter(\.isImage).count
-        let fileCount = message.attachments.count - imageCount
-
-        if imageCount > 0 && fileCount > 0 {
-            return "Shared \(imageCount) image\(imageCount == 1 ? "" : "s") and \(fileCount) file\(fileCount == 1 ? "" : "s")."
-        }
-
-        if imageCount > 0 {
-            return "Shared \(imageCount) image\(imageCount == 1 ? "" : "s")."
-        }
-
-        return "Shared \(fileCount) file\(fileCount == 1 ? "" : "s")."
     }
 
     private func schedulePreview() {

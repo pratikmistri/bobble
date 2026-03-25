@@ -31,7 +31,29 @@
 		A10000022 /* CopilotACPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000024 /* CopilotACPTransport.swift */; };
 		A10000025 /* ClaudeInteractiveTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000025 /* ClaudeInteractiveTransport.swift */; };
 		A10000026 /* CodexAppServerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000026 /* CodexAppServerTransport.swift */; };
+		A10000027 /* AttachmentSummaryFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000027 /* AttachmentSummaryFormatter.swift */; };
+		A10000028 /* ChatHeadPreviewFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000028 /* ChatHeadPreviewFormatter.swift */; };
+		A10000029 /* TypingIndicatorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000029 /* TypingIndicatorViews.swift */; };
+		A10000030 /* MarkdownMessageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000030 /* MarkdownMessageView.swift */; };
+		A10000031 /* MessageAttachmentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000031 /* MessageAttachmentViews.swift */; };
+		A10000032 /* MessageBubbleContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000032 /* MessageBubbleContentView.swift */; };
+		A10000033 /* UsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000033 /* UsageMonitor.swift */; };
+		A10000034 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000034 /* StatusBarController.swift */; };
+		A10000035 /* PanelCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000035 /* PanelCoordinator.swift */; };
+		A20000001 /* AttachmentSummaryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000001 /* AttachmentSummaryFormatterTests.swift */; };
+		A20000002 /* ProviderModelOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000002 /* ProviderModelOptionTests.swift */; };
+		A20000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20000003 /* XCTest.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		P10000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F10000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000001;
+			remoteInfo = Bobble;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		B10000001 /* BobbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BobbleApp.swift; sourceTree = "<group>"; };
@@ -60,7 +82,20 @@
 		B10000024 /* CopilotACPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotACPTransport.swift; sourceTree = "<group>"; };
 		B10000025 /* ClaudeInteractiveTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeInteractiveTransport.swift; sourceTree = "<group>"; };
 		B10000026 /* CodexAppServerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerTransport.swift; sourceTree = "<group>"; };
+		B10000027 /* AttachmentSummaryFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentSummaryFormatter.swift; sourceTree = "<group>"; };
+		B10000028 /* ChatHeadPreviewFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadPreviewFormatter.swift; sourceTree = "<group>"; };
+		B10000029 /* TypingIndicatorViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingIndicatorViews.swift; sourceTree = "<group>"; };
+		B10000030 /* MarkdownMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMessageView.swift; sourceTree = "<group>"; };
+		B10000031 /* MessageAttachmentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageAttachmentViews.swift; sourceTree = "<group>"; };
+		B10000032 /* MessageBubbleContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleContentView.swift; sourceTree = "<group>"; };
+		B10000033 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
+		B10000034 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
+		B10000035 /* PanelCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCoordinator.swift; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000001 /* AttachmentSummaryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentSummaryFormatterTests.swift; sourceTree = "<group>"; };
+		B20000002 /* ProviderModelOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModelOptionTests.swift; sourceTree = "<group>"; };
+		B20000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		B20000099 /* BobbleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BobbleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +106,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C10000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000003 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -78,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				D10000002 /* Bobble */,
+				D10000010 /* BobbleTests */,
 				D10000099 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -139,6 +183,10 @@
 				B10000014 /* ChatHeadStackView.swift */,
 				B10000015 /* ChatWindowView.swift */,
 				B10000016 /* MessageBubbleView.swift */,
+				B10000029 /* TypingIndicatorViews.swift */,
+				B10000030 /* MarkdownMessageView.swift */,
+				B10000031 /* MessageAttachmentViews.swift */,
+				B10000032 /* MessageBubbleContentView.swift */,
 				B10000017 /* InputBarView.swift */,
 				B10000021 /* BobbleRootView.swift */,
 				B10000022 /* FloatingControlCircle.swift */,
@@ -151,6 +199,7 @@
 			children = (
 				B10000003 /* FloatingPanel.swift */,
 				B10000004 /* WindowPositionManager.swift */,
+				B10000035 /* PanelCoordinator.swift */,
 			);
 			path = Windows;
 			sourceTree = "<group>";
@@ -159,6 +208,10 @@
 			isa = PBXGroup;
 			children = (
 				B10000005 /* DesignTokens.swift */,
+				B10000027 /* AttachmentSummaryFormatter.swift */,
+				B10000028 /* ChatHeadPreviewFormatter.swift */,
+				B10000033 /* UsageMonitor.swift */,
+				B10000034 /* StatusBarController.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -171,10 +224,20 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		D10000010 /* BobbleTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000001 /* AttachmentSummaryFormatterTests.swift */,
+				B20000002 /* ProviderModelOptionTests.swift */,
+			);
+			path = BobbleTests;
+			sourceTree = "<group>";
+		};
 		D10000099 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				B10000099 /* Bobble.app */,
+				B20000099 /* BobbleTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -198,6 +261,23 @@
 			productName = Bobble;
 			productReference = B10000099 /* Bobble.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E20000001 /* BobbleTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000004 /* Build configuration list for PBXNativeTarget "BobbleTests" */;
+			buildPhases = (
+				E20000002 /* Sources */,
+				C10000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T10000001 /* PBXTargetDependency */,
+			);
+			name = BobbleTests;
+			productName = BobbleTests;
+			productReference = B20000099 /* BobbleTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -223,9 +303,18 @@
 			projectRoot = "";
 			targets = (
 				E10000001 /* Bobble */,
+				E20000001 /* BobbleTests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXTargetDependency section */
+		T10000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000001 /* Bobble */;
+			targetProxy = P10000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		E10000003 /* Resources */ = {
@@ -266,6 +355,24 @@
 				A10000022 /* CopilotACPTransport.swift in Sources */,
 				A10000025 /* ClaudeInteractiveTransport.swift in Sources */,
 				A10000026 /* CodexAppServerTransport.swift in Sources */,
+				A10000027 /* AttachmentSummaryFormatter.swift in Sources */,
+				A10000028 /* ChatHeadPreviewFormatter.swift in Sources */,
+				A10000029 /* TypingIndicatorViews.swift in Sources */,
+				A10000030 /* MarkdownMessageView.swift in Sources */,
+				A10000031 /* MessageAttachmentViews.swift in Sources */,
+				A10000032 /* MessageBubbleContentView.swift in Sources */,
+				A10000033 /* UsageMonitor.swift in Sources */,
+				A10000034 /* StatusBarController.swift in Sources */,
+				A10000035 /* PanelCoordinator.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E20000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000001 /* AttachmentSummaryFormatterTests.swift in Sources */,
+				A20000002 /* ProviderModelOptionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -388,6 +495,8 @@
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Bobble/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Bobble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -412,8 +521,11 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = MJWG2F9J23;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Bobble/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Bobble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -425,6 +537,56 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		G10000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MJWG2F9J23;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = BobbleTests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bobble.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Bobble.app/Contents/MacOS/Bobble";
+				TEST_TARGET_NAME = Bobble;
+			};
+			name = Debug;
+		};
+		G10000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MJWG2F9J23;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = BobbleTests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bobble.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Bobble.app/Contents/MacOS/Bobble";
+				TEST_TARGET_NAME = Bobble;
 			};
 			name = Release;
 		};
@@ -445,6 +607,15 @@
 			buildConfigurations = (
 				G10000003 /* Debug */,
 				G10000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000004 /* Build configuration list for PBXNativeTarget "BobbleTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000005 /* Debug */,
+				G10000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
