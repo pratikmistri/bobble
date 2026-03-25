@@ -4,7 +4,7 @@ Bobble is a playful macOS app for working with AI agents through floating chat h
 
 Bobble gives each conversation its own draggable bubble, expandable chat window, local workspace, and quick access from the menu bar.
 
-![Bobble screenshot](./screenshot.png)
+![Bobble app screenshot](screenshot.png)
 
 ## What it does
 
