@@ -1,6 +1,7 @@
 # Xcode
 build/
 DerivedData/
+.deriveddata*/
 .derived-data*/
 *.xcuserstate
 *.xcuserdatad/
@@ -9,6 +10,7 @@ DerivedData/
 .DS_Store
 agents.md
 learnings.md
+.tmp-codex-schema/
 
 # Swift Package Manager
 .build/
