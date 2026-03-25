@@ -44,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusBarItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "bubble.left.fill", accessibilityDescription: "Bobble")
+            button.image = makeStatusBarIcon()
             button.toolTip = "Bobble"
         }
         let menu = makeStatusMenu()
@@ -58,11 +58,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         refreshUsage()
     }
 
+    private func makeStatusBarIcon() -> NSImage? {
+        let icon = NSImage(named: NSImage.Name("menubar"))
+            ?? NSImage(systemSymbolName: "bubble.left.fill", accessibilityDescription: "Bobble")
+        icon?.isTemplate = true
+        icon?.size = NSSize(width: 18, height: 18)
+        return icon
+    }
+
     private func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
 
-        let providerRoot = NSMenuItem(title: "Provider", action: nil, keyEquivalent: "")
+        let providerRoot = NSMenuItem(title: "Agents", action: nil, keyEquivalent: "")
         let providerSubmenu = NSMenu()
         providerMenuItems.removeAll()
 

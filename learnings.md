@@ -80,3 +80,12 @@ _Session log: what we did, what worked, what didn't._
 - Worked approach: normalized `InputBarView` outer insets by replacing split padding (`horizontal: 12`, `vertical: 8`) with uniform `.padding(12)`, which makes the chat input area spacing consistent on all sides in the expanded window.
 - Worked approach: allocate chat-head images from a usage-count pool when creating new sessions (`ChatHeadsManager.addSession`) so bobbles do not repeat until all 9 image assets are in use, then rotate through the least-used image.
 - Worked approach: migration on restore now assigns explicit bobble images to legacy sessions missing `hasAssignedChatHeadSymbol`, then immediately persists, so old data also follows the non-repeating allocation rule.
+- Constraint discovered: current target `Release` signing is `Apple Development` and app sandbox is disabled in `Bobble.entitlements`, so packaging for public distribution should use Developer ID signing + notarization (direct download), not Mac App Store flow.
+- Worked approach: added a dedicated `menubar.imageset` in `Resources/Assets.xcassets` backed by `menubar.svg` and switched `AppDelegate` status-item icon lookup to `NSImage(named: "menubar")`, with `isTemplate = true` so the icon automatically adapts to light/dark menu bar themes.
+- Worked approach: kept a system-symbol fallback (`bubble.left.fill`) if the custom asset is unavailable, and normalized status bar icon size to `18x18` for consistent rendering.
+- Verification note: local build passed with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Bobble.xcodeproj -scheme Bobble -configuration Debug -derivedDataPath /Users/pratikmistri/bobble/.derived-data-menubar CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build -quiet`.
+
+## 2026-03-25
+
+- Worked approach: renamed the menu bar provider section label from `Provider` to `Agents` in `AppDelegate.makeStatusMenu()` to match product terminology in the UI.
+- Worked approach: ignore all repo-local Xcode derived data directories with `.derived-data*/` in `.gitignore` so sandbox-friendly `xcodebuild -derivedDataPath` runs do not show up as untracked workspace noise.
