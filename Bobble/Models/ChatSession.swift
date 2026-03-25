@@ -35,12 +35,14 @@ enum ConversationExecutionMode: String, CaseIterable, Identifiable, Codable {
 }
 
 struct ChatSession: Identifiable, Codable {
-    static let defaultChatHeadSymbol = "💬"
+    static let defaultChatHeadSymbol = "Bobble1"
+    static let availableChatHeadImageNames: [String] = (1...9).map { "Bobble\($0)" }
 
     private enum CodingKeys: String, CodingKey {
         case id
         case name
         case chatHeadSymbol
+        case hasAssignedChatHeadSymbol
         case provider
         case selectedModel
         case conversationMode
@@ -57,6 +59,7 @@ struct ChatSession: Identifiable, Codable {
     let id: UUID
     var name: String
     var chatHeadSymbol: String
+    var hasAssignedChatHeadSymbol: Bool
     var provider: CLIBackend
     var conversationMode: ConversationExecutionMode
     var selectedModel: ProviderModelOption
@@ -111,8 +114,12 @@ struct ChatSession: Identifiable, Codable {
         }
     }
 
-    var displayChatHeadSymbol: String {
-        Self.sanitizedChatHeadSymbol(from: chatHeadSymbol) ?? Self.defaultChatHeadSymbol
+    var chatHeadImageName: String {
+        guard hasAssignedChatHeadSymbol,
+              let imageName = Self.sanitizedChatHeadImageName(from: chatHeadSymbol) else {
+            return Self.chatHeadImageName(for: id)
+        }
+        return imageName
     }
 
     var hasUnread: Bool {
@@ -145,6 +152,7 @@ struct ChatSession: Identifiable, Codable {
         id: UUID = UUID(),
         name: String = "New Chat",
         chatHeadSymbol: String = Self.defaultChatHeadSymbol,
+        hasAssignedChatHeadSymbol: Bool = false,
         provider: CLIBackend = .codex,
         conversationMode: ConversationExecutionMode? = nil,
         selectedModel: ProviderModelOption = .automatic,
@@ -159,7 +167,9 @@ struct ChatSession: Identifiable, Codable {
     ) {
         self.id = id
         self.name = name
-        self.chatHeadSymbol = chatHeadSymbol
+        let sanitizedChatHeadSymbol = Self.sanitizedChatHeadImageName(from: chatHeadSymbol)
+        self.chatHeadSymbol = sanitizedChatHeadSymbol ?? Self.defaultChatHeadSymbol
+        self.hasAssignedChatHeadSymbol = hasAssignedChatHeadSymbol && sanitizedChatHeadSymbol != nil
         self.provider = provider
         self.conversationMode = conversationMode ?? ConversationExecutionMode.defaultMode(for: provider)
         self.selectedModel = selectedModel.normalized(for: provider)
@@ -178,7 +188,10 @@ struct ChatSession: Identifiable, Codable {
 
         let id = try container.decode(UUID.self, forKey: .id)
         let name = try container.decode(String.self, forKey: .name)
-        let chatHeadSymbol = try container.decode(String.self, forKey: .chatHeadSymbol)
+        let chatHeadSymbol = try container.decodeIfPresent(String.self, forKey: .chatHeadSymbol) ?? Self.defaultChatHeadSymbol
+        let hasAssignedChatHeadSymbol = try container.decodeIfPresent(Bool.self, forKey: .hasAssignedChatHeadSymbol)
+            ?? (chatHeadSymbol != Self.defaultChatHeadSymbol
+                && Self.sanitizedChatHeadImageName(from: chatHeadSymbol) != nil)
         let provider = try container.decode(CLIBackend.self, forKey: .provider)
         let conversationMode = try container.decodeIfPresent(ConversationExecutionMode.self, forKey: .conversationMode)
             ?? ConversationExecutionMode.defaultMode(for: provider)
@@ -196,6 +209,7 @@ struct ChatSession: Identifiable, Codable {
             id: id,
             name: name,
             chatHeadSymbol: chatHeadSymbol,
+            hasAssignedChatHeadSymbol: hasAssignedChatHeadSymbol,
             provider: provider,
             conversationMode: conversationMode,
             selectedModel: selectedModel,
@@ -215,6 +229,7 @@ struct ChatSession: Identifiable, Codable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(chatHeadSymbol, forKey: .chatHeadSymbol)
+        try container.encode(hasAssignedChatHeadSymbol, forKey: .hasAssignedChatHeadSymbol)
         try container.encode(provider, forKey: .provider)
         try container.encode(conversationMode, forKey: .conversationMode)
         try container.encode(selectedModel, forKey: .selectedModel)
@@ -250,26 +265,42 @@ struct ChatSession: Identifiable, Codable {
         }
     }
 
-    static func sanitizedChatHeadSymbol(from rawValue: String) -> String? {
+    static func sanitizedChatHeadImageName(from rawValue: String) -> String? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        for character in trimmed where !character.isWhitespaceLike {
-            if character.isEmojiBadge {
-                return String(character)
-            }
+        let lowercased = trimmed.lowercased()
+        guard lowercased.hasPrefix("bobble") else { return nil }
+        let suffix = lowercased.dropFirst("bobble".count)
+        guard let number = Int(suffix), (1...availableChatHeadImageNames.count).contains(number) else { return nil }
+        return "Bobble\(number)"
+    }
+
+    static func mappedChatHeadImageName(from rawValue: String) -> String? {
+        if let sanitized = sanitizedChatHeadImageName(from: rawValue) {
+            return sanitized
         }
 
-        return nil
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let hash = abs(trimmed.hashValue)
+        return availableChatHeadImageNames[hash % availableChatHeadImageNames.count]
+    }
+
+    private static func chatHeadImageName(for id: UUID) -> String {
+        let hash = abs(id.uuidString.hashValue)
+        return availableChatHeadImageNames[hash % availableChatHeadImageNames.count]
     }
 
     mutating func updateChatHeadSymbol(from rawValue: String?) {
         guard let rawValue,
-              let symbol = Self.sanitizedChatHeadSymbol(from: rawValue) else {
+              let imageName = Self.mappedChatHeadImageName(from: rawValue) else {
             return
         }
 
-        chatHeadSymbol = symbol
+        chatHeadSymbol = imageName
+        hasAssignedChatHeadSymbol = true
         touchUpdatedAt()
     }
 
@@ -291,17 +322,5 @@ struct ChatSession: Identifiable, Codable {
             }
         }
         return restored
-    }
-}
-
-private extension Character {
-    var isEmojiBadge: Bool {
-        guard let firstScalar = unicodeScalars.first else { return false }
-        return firstScalar.properties.isEmojiPresentation
-            || (firstScalar.properties.isEmoji && unicodeScalars.count > 1)
-    }
-
-    var isWhitespaceLike: Bool {
-        unicodeScalars.allSatisfy { CharacterSet.whitespacesAndNewlines.contains($0) }
     }
 }

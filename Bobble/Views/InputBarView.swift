@@ -133,8 +133,7 @@ struct InputBarView: View {
                         )
                 )
         )
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(12)
         .onDrop(of: supportedDropTypes, isTargeted: $isDropTargeted, perform: handleDrop)
     }
 

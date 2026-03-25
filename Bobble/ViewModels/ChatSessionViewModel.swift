@@ -23,7 +23,6 @@ class ChatSessionViewModel: ObservableObject {
 
     private var conversationTransport: ConversationTransport?
     private var conversationTransportBackend: CLIBackend?
-    private var chatHeadSymbolProcess: CLIProcessManager?
     private var cancellables = Set<AnyCancellable>()
     private var didRequestScreenCaptureAccessThisLaunch = false
     private var didShowScreenCaptureAccessErrorThisLaunch = false
@@ -40,7 +39,6 @@ class ChatSessionViewModel: ObservableObject {
         let prompt = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = pendingAttachments
         guard !prompt.isEmpty || !attachments.isEmpty else { return }
-        let isFirstUserTurn = session.messages.isEmpty
         let backend = session.provider
 
         inputText = ""
@@ -56,10 +54,6 @@ class ChatSessionViewModel: ObservableObject {
         let userMessage = ChatMessage(role: .user, content: prompt, attachments: attachments)
         session.messages.append(userMessage)
         notifyUpdate()
-
-        if isFirstUserTurn {
-            updateChatHeadSymbolFromFirstMessage(prompt: prompt, attachments: attachments)
-        }
 
         if let replyInterruptionID = pendingTextReplyInterruptionID,
            let transport = conversationTransport {
@@ -113,8 +107,6 @@ class ChatSessionViewModel: ObservableObject {
 
     func terminate() {
         resetConversationTransport()
-        chatHeadSymbolProcess?.stop()
-        chatHeadSymbolProcess = nil
     }
 
     func selectModel(_ model: ProviderModelOption) {
@@ -786,81 +778,6 @@ class ChatSessionViewModel: ObservableObject {
 
         User request:
         \(effectivePrompt)
-        """
-    }
-
-    private func updateChatHeadSymbolFromFirstMessage(prompt: String, attachments: [ChatAttachment]) {
-        guard chatHeadSymbolProcess == nil else { return }
-        let backend = session.provider
-        guard let path = backend.resolvedPath() else { return }
-
-        let seed = buildChatHeadSymbolSeed(userPrompt: prompt, attachments: attachments)
-        guard !seed.isEmpty else { return }
-
-        var generatedOutput = ""
-        let process = CLIProcessManager(
-            backend: backend,
-            executablePath: path,
-            model: session.selectedModel.cliValue(for: backend),
-            prompt: buildChatHeadSymbolPrompt(from: seed),
-            imagePaths: attachments.filter(\.isImage).map(\.filePath),
-            sessionId: UUID().uuidString,
-            isResume: false,
-            workingDirectory: session.workspaceDirectory,
-            launchPurpose: .helperAutonomous
-        )
-
-        process.onTextChunk = { text in
-            generatedOutput += text
-        }
-
-        process.onResult = { text in
-            generatedOutput = text
-        }
-
-        process.onComplete = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.session.updateChatHeadSymbol(from: generatedOutput)
-                self.chatHeadSymbolProcess = nil
-                self.notifyUpdate()
-            }
-        }
-
-        process.onError = { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.chatHeadSymbolProcess = nil
-            }
-        }
-
-        chatHeadSymbolProcess = process
-        process.start()
-    }
-
-    private func buildChatHeadSymbolSeed(userPrompt: String, attachments: [ChatAttachment]) -> String {
-        let trimmedPrompt = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedPrompt.isEmpty else { return trimmedPrompt }
-
-        guard !attachments.isEmpty else { return "" }
-        let attachmentSummary = attachments.map { attachment in
-            "\(attachment.isImage ? "image" : "file"): \(attachment.fileName)"
-        }.joined(separator: ", ")
-
-        return "Attachment-only first message with: \(attachmentSummary)"
-    }
-
-    private func buildChatHeadSymbolPrompt(from seed: String) -> String {
-        """
-        Choose the single best emoji to represent this chat based on the first user message.
-
-        Rules:
-        - Return exactly one emoji and nothing else.
-        - Prefer specific emojis over generic ones.
-        - Do not return any words, punctuation, Markdown, or explanation.
-        - If the request is broad or unclear, return \(ChatSession.defaultChatHeadSymbol).
-
-        First user message:
-        \(seed)
         """
     }
 

@@ -14,7 +14,7 @@ struct ChatHeadView: View {
     @State private var isHovering = false
     @State private var isDropTargeted = false
     @State private var isShowingPreview = false
-    @State private var isEmojiBobbling = false
+    @State private var isHeadBobbling = false
     @State private var previewTask: Task<Void, Never>?
     private let controlShellDiameter: CGFloat = DesignTokens.headControlDiameter
 
@@ -22,37 +22,26 @@ struct ChatHeadView: View {
         let isHighlighted = isHovering || isDropTargeted
 
         ZStack {
-            // Main shell — participates in matchedGeometryEffect morph.
-            Group {
-                if #available(macOS 26.0, *) {
-                    Circle()
-                        .fill(.clear)
-                        .frame(width: controlShellDiameter, height: controlShellDiameter)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                } else {
-                    FloatingControlCircle(isHighlighted: isHighlighted, diameter: controlShellDiameter) {
-                        EmptyView()
-                    }
-                }
-            }
-            .matchedGeometryEffect(
-                id: session.id,
-                in: morphNamespace,
-                properties: [.frame, .position],
-                anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
-                isSource: true
-            )
-
-            Text(session.displayChatHeadSymbol)
-                .font(DesignTokens.headInitialFont)
-                .foregroundStyle(DesignTokens.textPrimary)
-                .scaleEffect(isWorking ? (isEmojiBobbling ? 1.08 : 0.95) : 1.0)
-                .rotationEffect(.degrees(isWorking ? (isEmojiBobbling ? 6 : -5) : 0))
-                .offset(y: isWorking ? (isEmojiBobbling ? -2 : 2) : 0)
+            ChatHeadAvatarView(imageName: session.chatHeadImageName, size: controlShellDiameter)
+                .matchedGeometryEffect(
+                    id: session.id,
+                    in: morphNamespace,
+                    properties: [.frame, .position],
+                    anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
+                    isSource: true
+                )
+                .scaleEffect(isWorking ? (isHeadBobbling ? 1.08 : 0.95) : 1.0)
+                .rotationEffect(.degrees(isWorking ? (isHeadBobbling ? 6 : -5) : 0))
+                .offset(y: isWorking ? (isHeadBobbling ? -2 : 2) : 0)
                 .shadow(
-                    color: HeadStatus.working.color.opacity(isWorking ? (isEmojiBobbling ? 0.42 : 0.18) : 0),
-                    radius: isWorking ? (isEmojiBobbling ? 10 : 4) : 0,
-                    y: isWorking ? (isEmojiBobbling ? 4 : 1) : 0
+                    color: .black.opacity(isHighlighted ? 0.22 : 0.14),
+                    radius: isHighlighted ? 10 : 5,
+                    y: isHighlighted ? 4 : 2
+                )
+                .shadow(
+                    color: HeadStatus.working.color.opacity(isWorking ? (isHeadBobbling ? 0.42 : 0.18) : 0),
+                    radius: isWorking ? (isHeadBobbling ? 10 : 4) : 0,
+                    y: isWorking ? (isHeadBobbling ? 4 : 1) : 0
                 )
 
             // Selection ring — animated stroke
@@ -73,6 +62,7 @@ struct ChatHeadView: View {
                 .scaleEffect(isDropTargeted ? 1 : 0.92)
         }
         .frame(width: controlShellDiameter, height: controlShellDiameter)
+        .contentShape(Circle())
         // Hover: lift + scale
         .scaleEffect(isHighlighted ? 1.04 : 1.0)
         .zIndex(isHovering || isDropTargeted || isShowingPreview ? 1000 : 0)
@@ -300,10 +290,10 @@ struct ChatHeadView: View {
     }
 
     private func startWorkingAnimation() {
-        guard !isEmojiBobbling else { return }
-        isEmojiBobbling = false
+        guard !isHeadBobbling else { return }
+        isHeadBobbling = false
         withAnimation(DesignTokens.motionPlayful.speed(1.05).repeatForever(autoreverses: true)) {
-            isEmojiBobbling = true
+            isHeadBobbling = true
         }
     }
 
@@ -311,7 +301,7 @@ struct ChatHeadView: View {
         var transaction = Transaction()
         transaction.animation = nil
         withTransaction(transaction) {
-            isEmojiBobbling = false
+            isHeadBobbling = false
         }
     }
 }
@@ -523,38 +513,18 @@ private struct ChatHeadPreviewBubble: View {
     let preview: ChatHeadPreviewContent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(sessionName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(DesignTokens.textPrimary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-
-                Text(preview.senderLabel)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(DesignTokens.textSecondary)
-                    .lineLimit(1)
-            }
-
-            Text(preview.message)
-                .font(.system(size: 12))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
+        SessionFlyoutSurface(contentPadding: 2) {
+            SessionFlyoutRowContent(
+                chatHeadImageName: ChatSession.defaultChatHeadSymbol,
+                title: sessionName,
+                subtitle: preview.message,
+                trailingLabel: preview.senderLabel,
+                subtitleLineLimit: 3,
+                showsLeadingAvatar: false
+            )
+            .padding(.horizontal, 10)
         }
         .frame(width: DesignTokens.headPreviewWidth, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(DesignTokens.surfaceColor.opacity(0.98))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(DesignTokens.borderColor.opacity(0.9), lineWidth: 1)
-                )
-        )
         .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
     }
 }

@@ -76,6 +76,24 @@ struct WindowPositionManager {
         )
     }
 
+
+    // Prevent oversized windows from forcing AppKit into repeated constraint passes.
+    func clampedPanelSize(_ size: NSSize, anchor: NSPoint) -> NSSize {
+        guard let screen = screen(containing: anchor) ?? nearestScreen(to: anchor) else {
+            return size
+        }
+
+        let frame = constrainedScreenFrame(for: screen)
+        let minHeight = (headDiameter * 2) + headSpacing + (DesignTokens.headInset * 2)
+        let minWidth = headDiameter + (DesignTokens.headInset * 2) + leadingOverflow
+        let maxHeight = max(frame.height, minHeight)
+        let maxWidth = max(frame.width + leadingOverflow, minWidth)
+
+        return NSSize(
+            width: min(size.width, maxWidth),
+            height: min(size.height, maxHeight)
+        )
+    }
     private func deckStackHeight(for count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return headDiameter + (CGFloat(count - 1) * DesignTokens.deckOffset) + headVisualPadding

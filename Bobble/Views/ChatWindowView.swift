@@ -57,14 +57,10 @@ struct ChatContentView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Circle()
-                    .fill(DesignTokens.surfaceAccent)
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Text(viewModel.session.displayChatHeadSymbol)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(DesignTokens.textPrimary)
-                    )
+                ChatHeadAvatarView(
+                    imageName: viewModel.session.chatHeadImageName,
+                    size: 28
+                )
 
                 Text(viewModel.session.name)
                     .font(DesignTokens.headerFont)

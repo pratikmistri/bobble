@@ -26,6 +26,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var physicsTimer: Timer?
     private var lastPhysicsStepTime: TimeInterval?
     private var suppressNextPanelSizeUpdate = false
+    private var lastAddSessionTimestamp: TimeInterval = 0
+    private let addSessionThrottleInterval: TimeInterval = 0.2
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBarItem()
@@ -163,7 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.manager.deleteHistorySession(session)
             },
             onAddSession: { [weak self] in
-                self?.manager.addSession()
+                self?.handleAddSessionRequest()
             },
             onHeadsDragChanged: { [weak self] in
                 self?.movePanelWithMouse()
@@ -196,7 +198,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         manager.onSessionAdded = { [weak self] session in
             self?.suppressNextPanelSizeUpdate = true
-            self?.expandSession(session)
+            self?.expandSession(session, animateStateChange: false)
         }
     }
 
@@ -226,7 +228,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func expandSession(_ session: ChatSession) {
+    private func expandSession(_ session: ChatSession, animateStateChange: Bool = true) {
         stopPhysics()
 
         let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
@@ -242,7 +244,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Keep the SwiftUI state flip paired with the panel resize, but
             // defer both until the hosting view has finished its current layout pass.
-            withAnimation(DesignTokens.motionLayout) {
+            if animateStateChange {
+                withAnimation(DesignTokens.motionLayout) {
+                    self.manager.expandedSessionId = session.id
+                }
+            } else {
                 self.manager.expandedSessionId = session.id
             }
         }
@@ -422,17 +428,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async(execute: mutation)
     }
 
+    private func handleAddSessionRequest() {
+        guard !isCollapsingSession else { return }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastAddSessionTimestamp >= addSessionThrottleInterval else { return }
+        lastAddSessionTimestamp = now
+        manager.addSession()
+    }
+
     private func resolvedPanelState(
         for size: NSSize,
         selectingBestDockSide: Bool = false
     ) -> (frame: NSRect, anchor: NSPoint, dockSide: PanelDockSide) {
+        let clampedSize = positionManager.clampedPanelSize(size, anchor: preferredPanelAnchor)
         let dockSide = selectingBestDockSide
-            ? bestDockSide(for: size, preferred: manager.panelDockSide)
+            ? bestDockSide(for: clampedSize, preferred: manager.panelDockSide)
             : manager.panelDockSide
-        let anchor = positionManager.constrainedPanelAnchor(preferredPanelAnchor, for: size, dockSide: dockSide)
-        let origin = positionManager.panelOrigin(for: size, anchor: anchor, dockSide: dockSide)
+        let anchor = positionManager.constrainedPanelAnchor(preferredPanelAnchor, for: clampedSize, dockSide: dockSide)
+        let origin = positionManager.panelOrigin(for: clampedSize, anchor: anchor, dockSide: dockSide)
         return (
-            frame: NSRect(origin: origin, size: size),
+            frame: NSRect(origin: origin, size: clampedSize),
             anchor: anchor,
             dockSide: dockSide
         )

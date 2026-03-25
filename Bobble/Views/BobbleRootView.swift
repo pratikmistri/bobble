@@ -334,65 +334,58 @@ private struct HistoryPopoverView: View {
     let onDelete: (ChatHeadsManager.HistoryEntry) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("History")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DesignTokens.textPrimary)
-
-                Spacer(minLength: 0)
-
-                Text("\(entries.count)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DesignTokens.textSecondary)
-            }
-
-            if entries.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("No conversation history yet.")
-                        .font(.system(size: 13, weight: .semibold))
+        SessionFlyoutSurface {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("History")
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(DesignTokens.textPrimary)
 
-                    Text("A chat appears here automatically after your first message, and the preview keeps updating as the conversation progresses.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(DesignTokens.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 12)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            VStack(spacing: 0) {
-                                HistorySessionRow(
-                                    entry: entry,
-                                    onOpen: { onOpen(entry) },
-                                    onDelete: { onDelete(entry) }
-                                )
+                    Spacer(minLength: 0)
 
-                                if index < entries.count - 1 {
-                                    Divider()
-                                        .overlay(DesignTokens.borderColor.opacity(0.45))
-                                        .padding(.leading, 46)
+                    Text("\(entries.count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+
+                if entries.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No conversation history yet.")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(DesignTokens.textPrimary)
+
+                        Text("A chat appears here automatically after your first message, and the preview keeps updating as the conversation progresses.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                VStack(spacing: 0) {
+                                    HistorySessionRow(
+                                        entry: entry,
+                                        onOpen: { onOpen(entry) },
+                                        onDelete: { onDelete(entry) }
+                                    )
+
+                                    if index < entries.count - 1 {
+                                        Divider()
+                                            .overlay(DesignTokens.borderColor.opacity(0.45))
+                                            .padding(.leading, 46)
+                                    }
                                 }
                             }
                         }
                     }
+                    .frame(maxHeight: 320)
                 }
-                .frame(maxHeight: 320)
             }
         }
-        .padding(12)
         .frame(width: 328, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(DesignTokens.surfaceColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(DesignTokens.borderColor.opacity(0.75), lineWidth: 1)
-                )
-        )
     }
 }
 
@@ -408,43 +401,14 @@ private struct HistorySessionRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Button(action: onOpen) {
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(DesignTokens.surfaceAccent.opacity(0.82))
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Text(session.displayChatHeadSymbol)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(DesignTokens.textPrimary)
-                        )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(session.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(DesignTokens.textPrimary)
-                                .lineLimit(1)
-
-                            Spacer(minLength: 0)
-
-                            Text(session.updatedAt, style: .relative)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .monospacedDigit()
-                                .lineLimit(1)
-                        }
-
-                        Text(session.historyPreview)
-                            .font(.system(size: 11))
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-                .background(DesignTokens.surfaceElevated.opacity(isHovering ? 0.42 : 0))
+                SessionFlyoutRowContent(
+                    chatHeadImageName: session.chatHeadImageName,
+                    title: session.name,
+                    subtitle: session.historyPreview,
+                    trailingLabel: session.updatedRelativeDescription,
+                    subtitleLineLimit: 2,
+                    isHighlighted: isHovering
+                )
             }
             .buttonStyle(.plain)
 
@@ -469,6 +433,16 @@ private struct HistorySessionRow: View {
 }
 
 private extension ChatSession {
+    private static let flyoutRelativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+
+    var updatedRelativeDescription: String {
+        Self.flyoutRelativeDateFormatter.localizedString(for: updatedAt, relativeTo: Date())
+    }
+
     var historyPreview: String {
         if let message = messages.reversed().first(where: { $0.role != .system && (!$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !$0.attachments.isEmpty) }) {
             let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
