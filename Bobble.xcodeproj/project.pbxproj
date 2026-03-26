@@ -117,12 +117,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		433E28BC2F73AABD00A2765B /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				B20000003 /* XCTest.framework */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		D10000001 = {
 			isa = PBXGroup;
 			children = (
 				D10000002 /* Bobble */,
 				D10000010 /* BobbleTests */,
 				D10000099 /* Products */,
+				433E28BC2F73AABD00A2765B /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -308,14 +317,6 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXTargetDependency section */
-		T10000001 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = E10000001 /* Bobble */;
-			targetProxy = P10000001 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin PBXResourcesBuildPhase section */
 		E10000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
@@ -377,6 +378,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		T10000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000001 /* Bobble */;
+			targetProxy = P10000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		G10000001 /* Debug */ = {
@@ -516,12 +525,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Bobble/Bobble.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = MJWG2F9J23;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = MJWG2F9J23;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Bobble/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Bobble;
@@ -535,6 +546,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bobble.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};

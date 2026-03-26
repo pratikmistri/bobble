@@ -208,10 +208,7 @@ class ChatSessionViewModel: ObservableObject {
         transport.onEventText = { [weak self] text in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                let kind = self.classifySystemEventKind(trimmed)
-                self.session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
+                self.appendSystemEvent(text)
                 self.notifyUpdate()
             }
         }
@@ -642,6 +639,105 @@ class ChatSessionViewModel: ObservableObject {
         }
 
         return .regular
+    }
+
+    private func appendSystemEvent(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let kind = classifySystemEventKind(trimmed)
+        if kind == .agentThought {
+            appendOrMergeAgentThought(trimmed)
+            return
+        }
+
+        session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
+    }
+
+    private func appendOrMergeAgentThought(_ incoming: String) {
+        guard let lastIndex = session.messages.indices.last,
+              session.messages[lastIndex].role == .system,
+              session.messages[lastIndex].kind == .agentThought else {
+            session.messages.append(ChatMessage(role: .system, content: incoming, kind: .agentThought))
+            return
+        }
+
+        let existing = session.messages[lastIndex].content
+        let merged = mergeThoughtEvent(existing: existing, incoming: incoming)
+        session.messages[lastIndex].content = merged
+    }
+
+    private func mergeThoughtEvent(existing: String, incoming: String) -> String {
+        if incoming == existing {
+            return existing
+        }
+        if incoming.hasPrefix(existing) {
+            return incoming
+        }
+        if existing.hasPrefix(incoming) {
+            return existing
+        }
+
+        guard let existingBody = thoughtBody(from: existing),
+              let incomingBody = thoughtBody(from: incoming) else {
+            if existing.contains(incoming) {
+                return existing
+            }
+            return existing + "\n" + incoming
+        }
+
+        let mergedBody = mergeThoughtBody(current: existingBody, incoming: incomingBody)
+        return mergedBody.isEmpty ? "Agent thought" : "Agent thought\n\(mergedBody)"
+    }
+
+    private func thoughtBody(from eventText: String) -> String? {
+        let title = "Agent thought"
+        guard eventText.lowercased().hasPrefix(title.lowercased()) else { return nil }
+
+        let components = eventText.components(separatedBy: "\n")
+        guard components.count > 1 else { return "" }
+        return components.dropFirst().joined(separator: "\n")
+    }
+
+    private func mergeThoughtBody(current: String, incoming: String) -> String {
+        if incoming == current {
+            return current
+        }
+        if incoming.hasPrefix(current) {
+            return incoming
+        }
+        if current.hasPrefix(incoming) {
+            return current
+        }
+        if current.contains(incoming) {
+            return current
+        }
+        if incoming.contains(current) {
+            return incoming
+        }
+
+        guard !current.isEmpty else { return incoming }
+        guard !incoming.isEmpty else { return current }
+
+        let needsSpacer = !endsWithWhitespace(current)
+            && !startsWithWhitespace(incoming)
+            && !startsWithPunctuation(incoming)
+        return current + (needsSpacer ? " " : "") + incoming
+    }
+
+    private func startsWithWhitespace(_ text: String) -> Bool {
+        guard let scalar = text.unicodeScalars.first else { return false }
+        return CharacterSet.whitespacesAndNewlines.contains(scalar)
+    }
+
+    private func endsWithWhitespace(_ text: String) -> Bool {
+        guard let scalar = text.unicodeScalars.last else { return false }
+        return CharacterSet.whitespacesAndNewlines.contains(scalar)
+    }
+
+    private func startsWithPunctuation(_ text: String) -> Bool {
+        guard let scalar = text.unicodeScalars.first else { return false }
+        return CharacterSet.punctuationCharacters.contains(scalar)
     }
 
     private func hydrateDerivedAssistantAttachments() {
