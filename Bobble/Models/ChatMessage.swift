@@ -129,6 +129,15 @@ struct ChatMessage: Identifiable, Codable {
         kind == .permission || kind == .question
     }
 
+    var isVisibleInPrimaryTimeline: Bool {
+        switch role {
+        case .user, .assistant, .error:
+            return true
+        case .system:
+            return kind == .agentThought || isInterruptionCard
+        }
+    }
+
     var interruptionCardTitle: String? {
         interruptionTitle ?? defaultInterruptionCardTitle
     }

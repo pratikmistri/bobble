@@ -6,7 +6,6 @@ struct MessageBubbleView: View {
     let onInterruptionAction: ((ChatMessage.InterruptionAction) -> Void)?
 
     @State private var appeared = false
-    @State private var cursorVisible = true
     @State private var isExpanded = false
 
     init(
@@ -53,7 +52,6 @@ struct MessageBubbleView: View {
                             message: message,
                             foregroundColor: foregroundColor,
                             isCollapsed: isCollapsed,
-                            cursorVisible: cursorVisible,
                             onInterruptionAction: onInterruptionAction
                         )
                             .foregroundColor(foregroundColor)
@@ -97,11 +95,6 @@ struct MessageBubbleView: View {
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.97, anchor: message.role == .user ? .bottomTrailing : .bottomLeading)
         .onAppear {
-            if message.isStreaming {
-                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
-                    cursorVisible.toggle()
-                }
-            }
             let delay = message.isStreaming ? 0.0 : min(Double(index) * 0.04, 0.2)
             withAnimation(DesignTokens.motionEntrance.delay(delay)) {
                 appeared = true

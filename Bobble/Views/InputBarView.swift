@@ -59,7 +59,7 @@ struct InputBarView: View {
             HStack(alignment: .center, spacing: 12) {
                 HStack(spacing: 10) {
                     Button(action: selectAttachments) {
-                        Image(systemName: "paperclip")
+                        Image(systemName: "plus")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(DesignTokens.textSecondary)
                     }

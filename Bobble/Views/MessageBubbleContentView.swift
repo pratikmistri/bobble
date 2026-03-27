@@ -4,7 +4,6 @@ struct MessageBubbleContentView: View {
     let message: ChatMessage
     let foregroundColor: Color
     let isCollapsed: Bool
-    let cursorVisible: Bool
     let onInterruptionAction: ((ChatMessage.InterruptionAction) -> Void)?
 
     var body: some View {
@@ -122,11 +121,7 @@ struct MessageBubbleContentView: View {
     }
 
     private var bubbleText: Text {
-        let base = Text(message.content)
-        if message.isStreaming {
-            return base + Text(" |").foregroundColor(foregroundColor.opacity(cursorVisible ? 1 : 0.2))
-        }
-        return base
+        Text(message.content)
     }
 
     private var shouldUsePlainText: Bool {
