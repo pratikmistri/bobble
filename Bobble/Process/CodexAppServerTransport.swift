@@ -373,10 +373,11 @@ final class CodexAppServerTransport: ConversationTransport {
                let itemType = item["type"] as? String,
                itemType == "agentMessage",
                let text = item["text"] as? String,
-               !text.isEmpty,
-               !emittedAssistantMessageStart {
-                emittedAssistantMessageStart = true
-                onAssistantMessageStarted?()
+               !text.isEmpty {
+                if !emittedAssistantMessageStart {
+                    emittedAssistantMessageStart = true
+                    onAssistantMessageStarted?()
+                }
                 onResult?(text)
             }
 

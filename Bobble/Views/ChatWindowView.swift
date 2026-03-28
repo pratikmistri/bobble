@@ -13,17 +13,12 @@ struct ChatContentView: View {
     @State private var headerAppeared = false
     @State private var contentAppeared = false
 
-    private var chronologicalMessages: [ChatMessage] {
-        viewModel.session.messages.sorted { lhs, rhs in
-            if lhs.timestamp != rhs.timestamp {
-                return lhs.timestamp < rhs.timestamp
-            }
-            return lhs.id.uuidString < rhs.id.uuidString
-        }
+    private var visibleMessages: [ChatMessage] {
+        viewModel.session.messages.filter(\.isVisibleInPrimaryTimeline)
     }
 
     private var activeStreamingAssistantMessage: ChatMessage? {
-        chronologicalMessages.last(where: { $0.role == .assistant && $0.isStreaming })
+        visibleMessages.last(where: { $0.role == .assistant && $0.isStreaming })
     }
 
     private var shouldShowTypingIndicatorPlaceholder: Bool {
@@ -36,7 +31,7 @@ struct ChatContentView: View {
             return AnyHashable(typingIndicatorID)
         }
 
-        return chronologicalMessages.last.map { AnyHashable($0.id) }
+        return visibleMessages.last.map { AnyHashable($0.id) }
     }
 
     private func scrollToBottom(using proxy: ScrollViewProxy, animated: Bool) {
@@ -98,7 +93,7 @@ struct ChatContentView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(chronologicalMessages.enumerated()), id: \.element.id) { index, message in
+                        ForEach(Array(visibleMessages.enumerated()), id: \.element.id) { index, message in
                             MessageBubbleView(
                                 message: message,
                                 index: index,
@@ -122,7 +117,7 @@ struct ChatContentView: View {
                 .onChange(of: session.id) {
                     scrollToBottom(using: proxy, animated: false)
                 }
-                .onChange(of: viewModel.session.messages.count) {
+                .onChange(of: visibleMessages.count) {
                     scrollToBottom(using: proxy, animated: true)
                 }
                 .onChange(of: shouldShowTypingIndicatorPlaceholder) {

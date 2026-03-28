@@ -30,6 +30,128 @@ class ChatSessionViewModel: ObservableObject {
     private var shouldResetTransportAfterTurn = false
     private var pendingTextReplyInterruptionID: String?
 
+    static func mergeAssistantContent(current: String, incoming: String) -> String? {
+        guard !incoming.isEmpty else { return nil }
+        if incoming == current {
+            return nil
+        }
+        if incoming.hasPrefix(current) {
+            return incoming
+        }
+        if current.hasPrefix(incoming) || current.hasSuffix(incoming) {
+            return nil
+        }
+
+        let overlap = suffixPrefixOverlapLength(current: current, incoming: incoming)
+        if overlap > 0 {
+            let index = incoming.index(incoming.startIndex, offsetBy: overlap)
+            return current + incoming[index...]
+        }
+
+        if incoming.count > current.count, incoming.contains(current) {
+            return incoming
+        }
+
+        return current + incoming
+    }
+
+    static func normalizeThoughtEventText(_ eventText: String) -> String? {
+        let trimmed = eventText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lines = trimmed.components(separatedBy: "\n")
+        let title = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let isKnownThoughtTitle = title.hasPrefix("agent thought")
+            || title.hasPrefix("codex reasoning")
+            || title == "reasoning"
+            || title.hasPrefix("reasoning ")
+
+        let body = isKnownThoughtTitle
+            ? lines.dropFirst().joined(separator: "\n")
+            : trimmed
+
+        let isEmptyBody = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return isEmptyBody ? "Agent thought" : "Agent thought\n\(body)"
+    }
+
+    static func mergeThoughtEventText(existing: String, incoming: String) -> String {
+        guard let normalizedExisting = normalizeThoughtEventText(existing),
+              let normalizedIncoming = normalizeThoughtEventText(incoming) else {
+            return existing
+        }
+
+        if normalizedIncoming == normalizedExisting {
+            return normalizedExisting
+        }
+        if normalizedIncoming.hasPrefix(normalizedExisting) {
+            return normalizedIncoming
+        }
+        if normalizedExisting.hasPrefix(normalizedIncoming) {
+            return normalizedExisting
+        }
+
+        guard let existingBody = thoughtBody(from: normalizedExisting),
+              let incomingBody = thoughtBody(from: normalizedIncoming) else {
+            if normalizedExisting.contains(normalizedIncoming) {
+                return normalizedExisting
+            }
+            return normalizedExisting + "\n" + normalizedIncoming
+        }
+
+        let mergedBody = mergeThoughtBody(current: existingBody, incoming: incomingBody)
+        return mergedBody.isEmpty ? "Agent thought" : "Agent thought\n\(mergedBody)"
+    }
+
+    static func thoughtBody(from eventText: String) -> String? {
+        let title = "Agent thought"
+        guard eventText.lowercased().hasPrefix(title.lowercased()) else { return nil }
+
+        let components = eventText.components(separatedBy: "\n")
+        guard components.count > 1 else { return "" }
+        return components.dropFirst().joined(separator: "\n")
+    }
+
+    static func mergeThoughtBody(current: String, incoming: String) -> String {
+        if incoming == current {
+            return current
+        }
+        if incoming.hasPrefix(current) {
+            return incoming
+        }
+        if current.hasPrefix(incoming) || current.hasSuffix(incoming) {
+            return current
+        }
+        if incoming.contains(current) {
+            return incoming
+        }
+
+        guard !current.isEmpty else { return incoming }
+        guard !incoming.isEmpty else { return current }
+
+        let overlap = suffixPrefixOverlapLength(current: current, incoming: incoming)
+        if overlap > 0 {
+            let index = incoming.index(incoming.startIndex, offsetBy: overlap)
+            return current + incoming[index...]
+        }
+
+        return current + incoming
+    }
+
+    static func suffixPrefixOverlapLength(current: String, incoming: String) -> Int {
+        let maxOverlap = min(current.count, incoming.count)
+        guard maxOverlap > 0 else { return 0 }
+
+        for overlap in stride(from: maxOverlap, through: 1, by: -1) {
+            let currentStart = current.index(current.endIndex, offsetBy: -overlap)
+            let incomingEnd = incoming.index(incoming.startIndex, offsetBy: overlap)
+            if current[currentStart...] == incoming[..<incomingEnd] {
+                return overlap
+            }
+        }
+
+        return 0
+    }
+
     init(session: ChatSession) {
         self.session = session
         hydrateDerivedAssistantAttachments()
@@ -534,26 +656,23 @@ class ChatSessionViewModel: ObservableObject {
         guard !text.isEmpty else { return }
         startAssistantMessageIfNeeded()
 
-        guard let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) else {
+        guard let foundIndex = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) else {
             return
         }
 
+        let idx = reorderedStreamingAssistantIndexIfNeeded(from: foundIndex)
         let current = session.messages[idx].content
-        // Some backends may emit both deltas and full snapshots. If we get a full
-        // snapshot, replace instead of append to prevent duplicated text.
-        if text == current {
+        guard let merged = Self.mergeAssistantContent(current: current, incoming: text) else {
             return
-        } else if text.hasPrefix(current) {
-            session.messages[idx].content = text
-        } else {
-            session.messages[idx].content += text
         }
+        session.messages[idx].content = merged
 
         syncDerivedAttachments(forMessageAt: idx)
     }
 
     private func completeAssistantMessage(with text: String) {
-        if let idx = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+        if let foundIndex = session.messages.lastIndex(where: { $0.role == .assistant && $0.isStreaming }) {
+            let idx = reorderedStreamingAssistantIndexIfNeeded(from: foundIndex)
             if !text.isEmpty {
                 session.messages[idx].content = text
             }
@@ -570,6 +689,16 @@ class ChatSessionViewModel: ObservableObject {
         if let idx = session.messages.indices.last {
             syncDerivedAttachments(forMessageAt: idx)
         }
+    }
+
+    private func reorderedStreamingAssistantIndexIfNeeded(from index: Int) -> Int {
+        guard session.provider == .copilot else { return index }
+        guard session.messages.indices.contains(index) else { return index }
+        guard let lastIndex = session.messages.indices.last, index != lastIndex else { return index }
+
+        let message = session.messages.remove(at: index)
+        session.messages.append(message)
+        return session.messages.indices.last ?? index
     }
 
     private func finishAssistantRun() {
@@ -646,98 +775,23 @@ class ChatSessionViewModel: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         let kind = classifySystemEventKind(trimmed)
-        if kind == .agentThought {
-            appendOrMergeAgentThought(trimmed)
-            return
-        }
-
-        session.messages.append(ChatMessage(role: .system, content: trimmed, kind: kind))
+        guard kind == .agentThought else { return }
+        appendOrMergeAgentThought(trimmed)
     }
 
     private func appendOrMergeAgentThought(_ incoming: String) {
+        guard let normalizedIncoming = Self.normalizeThoughtEventText(incoming) else { return }
+
         guard let lastIndex = session.messages.indices.last,
               session.messages[lastIndex].role == .system,
               session.messages[lastIndex].kind == .agentThought else {
-            session.messages.append(ChatMessage(role: .system, content: incoming, kind: .agentThought))
+            session.messages.append(ChatMessage(role: .system, content: normalizedIncoming, kind: .agentThought))
             return
         }
 
         let existing = session.messages[lastIndex].content
-        let merged = mergeThoughtEvent(existing: existing, incoming: incoming)
+        let merged = Self.mergeThoughtEventText(existing: existing, incoming: normalizedIncoming)
         session.messages[lastIndex].content = merged
-    }
-
-    private func mergeThoughtEvent(existing: String, incoming: String) -> String {
-        if incoming == existing {
-            return existing
-        }
-        if incoming.hasPrefix(existing) {
-            return incoming
-        }
-        if existing.hasPrefix(incoming) {
-            return existing
-        }
-
-        guard let existingBody = thoughtBody(from: existing),
-              let incomingBody = thoughtBody(from: incoming) else {
-            if existing.contains(incoming) {
-                return existing
-            }
-            return existing + "\n" + incoming
-        }
-
-        let mergedBody = mergeThoughtBody(current: existingBody, incoming: incomingBody)
-        return mergedBody.isEmpty ? "Agent thought" : "Agent thought\n\(mergedBody)"
-    }
-
-    private func thoughtBody(from eventText: String) -> String? {
-        let title = "Agent thought"
-        guard eventText.lowercased().hasPrefix(title.lowercased()) else { return nil }
-
-        let components = eventText.components(separatedBy: "\n")
-        guard components.count > 1 else { return "" }
-        return components.dropFirst().joined(separator: "\n")
-    }
-
-    private func mergeThoughtBody(current: String, incoming: String) -> String {
-        if incoming == current {
-            return current
-        }
-        if incoming.hasPrefix(current) {
-            return incoming
-        }
-        if current.hasPrefix(incoming) {
-            return current
-        }
-        if current.contains(incoming) {
-            return current
-        }
-        if incoming.contains(current) {
-            return incoming
-        }
-
-        guard !current.isEmpty else { return incoming }
-        guard !incoming.isEmpty else { return current }
-
-        let needsSpacer = !endsWithWhitespace(current)
-            && !startsWithWhitespace(incoming)
-            && !startsWithPunctuation(incoming)
-        return current + (needsSpacer ? " " : "") + incoming
-    }
-
-    private func startsWithWhitespace(_ text: String) -> Bool {
-        guard let scalar = text.unicodeScalars.first else { return false }
-        return CharacterSet.whitespacesAndNewlines.contains(scalar)
-    }
-
-    private func endsWithWhitespace(_ text: String) -> Bool {
-        guard let scalar = text.unicodeScalars.last else { return false }
-        return CharacterSet.whitespacesAndNewlines.contains(scalar)
-    }
-
-    private func startsWithPunctuation(_ text: String) -> Bool {
-        guard let scalar = text.unicodeScalars.first else { return false }
-        return CharacterSet.punctuationCharacters.contains(scalar)
     }
 
     private func hydrateDerivedAssistantAttachments() {

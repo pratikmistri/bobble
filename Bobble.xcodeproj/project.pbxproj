@@ -40,9 +40,12 @@
 		A10000033 /* UsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000033 /* UsageMonitor.swift */; };
 		A10000034 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000034 /* StatusBarController.swift */; };
 		A10000035 /* PanelCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000035 /* PanelCoordinator.swift */; };
+		A10000036 /* ChatHeadsLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000036 /* ChatHeadsLayoutMode.swift */; };
 		A20000001 /* AttachmentSummaryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000001 /* AttachmentSummaryFormatterTests.swift */; };
 		A20000002 /* ProviderModelOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000002 /* ProviderModelOptionTests.swift */; };
 		A20000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20000003 /* XCTest.framework */; };
+		A20000004 /* WindowPositionManagerLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000004 /* WindowPositionManagerLayoutTests.swift */; };
+		A20000005 /* ChatHeadsLayoutModePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000005 /* ChatHeadsLayoutModePersistenceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,10 +94,13 @@
 		B10000033 /* UsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitor.swift; sourceTree = "<group>"; };
 		B10000034 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		B10000035 /* PanelCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCoordinator.swift; sourceTree = "<group>"; };
+		B10000036 /* ChatHeadsLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadsLayoutMode.swift; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000001 /* AttachmentSummaryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentSummaryFormatterTests.swift; sourceTree = "<group>"; };
 		B20000002 /* ProviderModelOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModelOptionTests.swift; sourceTree = "<group>"; };
 		B20000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		B20000004 /* WindowPositionManagerLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPositionManagerLayoutTests.swift; sourceTree = "<group>"; };
+		B20000005 /* ChatHeadsLayoutModePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadsLayoutModePersistenceTests.swift; sourceTree = "<group>"; };
 		B20000099 /* BobbleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BobbleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -159,6 +165,7 @@
 				B10000006 /* ChatSession.swift */,
 				B10000007 /* ChatMessage.swift */,
 				B10000008 /* CLIBackend.swift */,
+				B10000036 /* ChatHeadsLayoutMode.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -238,6 +245,8 @@
 			children = (
 				B20000001 /* AttachmentSummaryFormatterTests.swift */,
 				B20000002 /* ProviderModelOptionTests.swift */,
+				B20000004 /* WindowPositionManagerLayoutTests.swift */,
+				B20000005 /* ChatHeadsLayoutModePersistenceTests.swift */,
 			);
 			path = BobbleTests;
 			sourceTree = "<group>";
@@ -365,6 +374,7 @@
 				A10000033 /* UsageMonitor.swift in Sources */,
 				A10000034 /* StatusBarController.swift in Sources */,
 				A10000035 /* PanelCoordinator.swift in Sources */,
+				A10000036 /* ChatHeadsLayoutMode.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,6 +384,8 @@
 			files = (
 				A20000001 /* AttachmentSummaryFormatterTests.swift in Sources */,
 				A20000002 /* ProviderModelOptionTests.swift in Sources */,
+				A20000004 /* WindowPositionManagerLayoutTests.swift in Sources */,
+				A20000005 /* ChatHeadsLayoutModePersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

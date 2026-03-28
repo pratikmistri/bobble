@@ -17,11 +17,20 @@ struct WindowPositionManager {
 
     // MARK: - Collapsed state (just heads)
 
-    func collapsedPanelSize(count: Int) -> NSSize {
+    func collapsedPanelSize(count: Int, layoutMode: ChatHeadsLayoutMode) -> NSSize {
+        switch layoutMode {
+        case .vertical:
+            return collapsedPanelSizeVertical(count: count)
+        case .horizontal:
+            return collapsedPanelSizeHorizontal(count: count)
+        }
+    }
+
+    private func collapsedPanelSizeVertical(count: Int) -> NSSize {
         let inset = DesignTokens.headInset * 2
         let addControlHeight = headDiameter
         let historyControlHeight = headDiameter
-        let headStackHeight = collapsedHeadStackHeight(for: count)
+        let headStackHeight = collapsedHeadStackLength(for: count)
 
         var rows: [CGFloat] = [addControlHeight, historyControlHeight]
         if headStackHeight > 0 {
@@ -40,9 +49,43 @@ struct WindowPositionManager {
         )
     }
 
+    private func collapsedPanelSizeHorizontal(count: Int) -> NSSize {
+        let inset = DesignTokens.headInset * 2
+        let controlWidth = DesignTokens.headControlDiameter
+        let addControlWidth = controlWidth
+        let historyControlWidth = controlWidth
+        let headStackWidth = collapsedHeadStackLength(for: count)
+
+        var columns: [CGFloat] = [addControlWidth, historyControlWidth]
+        if headStackWidth > 0 {
+            columns.append(headStackWidth)
+        }
+
+        let width = inset
+            + columns.reduce(0, +)
+            + CGFloat(max(columns.count - 1, 0)) * headSpacing
+            + DesignTokens.headPreviewOverflow
+        let height = inset + controlWidth
+
+        return NSSize(width: width, height: height)
+    }
+
     // MARK: - Expanded state (inline chat + stacked controls)
 
-    func expandedPanelSize(headsCount: Int, expandedIndex: Int? = nil) -> NSSize {
+    func expandedPanelSize(
+        headsCount: Int,
+        expandedIndex: Int? = nil,
+        layoutMode: ChatHeadsLayoutMode
+    ) -> NSSize {
+        switch layoutMode {
+        case .vertical:
+            return expandedPanelSizeVertical(headsCount: headsCount, expandedIndex: expandedIndex)
+        case .horizontal:
+            return expandedPanelSizeHorizontal(headsCount: headsCount, expandedIndex: expandedIndex)
+        }
+    }
+
+    private func expandedPanelSizeVertical(headsCount: Int, expandedIndex: Int? = nil) -> NSSize {
         let stackCount = max(headsCount, 0)
         let inset = DesignTokens.headInset * 2
 
@@ -60,11 +103,11 @@ struct WindowPositionManager {
 
         var rows: [CGFloat] = [addH, historyH]
         if topStackCount > 0 {
-            rows.append(deckStackHeight(for: topStackCount))
+            rows.append(deckStackLength(for: topStackCount))
         }
         rows.append(chatHeight)
         if bottomStackCount > 0 {
-            rows.append(deckStackHeight(for: bottomStackCount))
+            rows.append(deckStackLength(for: bottomStackCount))
         }
 
         let rowsHeight = rows.reduce(0, +)
@@ -74,6 +117,41 @@ struct WindowPositionManager {
             width: chatWidth + DesignTokens.headPreviewOverflow,
             height: totalH
         )
+    }
+
+    private func expandedPanelSizeHorizontal(headsCount: Int, expandedIndex: Int? = nil) -> NSSize {
+        let stackCount = max(headsCount, 0)
+        let inset = DesignTokens.headInset * 2
+
+        let clampedExpandedIndex: Int? = {
+            guard let expandedIndex, stackCount > 0 else { return nil }
+            return min(max(expandedIndex, 0), stackCount - 1)
+        }()
+        let beforeCount = clampedExpandedIndex ?? 0
+        let afterCount = clampedExpandedIndex.map { max(stackCount - $0 - 1, 0) } ?? 0
+
+        let controlWidth = DesignTokens.headControlDiameter
+        var columns: [CGFloat] = [controlWidth, controlWidth]
+
+        let beforeStackWidth = deckStackLength(for: beforeCount)
+        if beforeStackWidth > 0 {
+            columns.append(beforeStackWidth)
+        }
+
+        columns.append(chatWidth)
+
+        let afterStackWidth = deckStackLength(for: afterCount)
+        if afterStackWidth > 0 {
+            columns.append(afterStackWidth)
+        }
+
+        let width = inset
+            + columns.reduce(0, +)
+            + CGFloat(max(columns.count - 1, 0)) * headSpacing
+            + DesignTokens.headPreviewOverflow
+        let height = inset + max(chatHeight, controlWidth)
+
+        return NSSize(width: width, height: height)
     }
 
 
@@ -94,12 +172,12 @@ struct WindowPositionManager {
             height: min(size.height, maxHeight)
         )
     }
-    private func deckStackHeight(for count: Int) -> CGFloat {
+    private func deckStackLength(for count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return headDiameter + (CGFloat(count - 1) * DesignTokens.deckOffset) + headVisualPadding
     }
 
-    private func collapsedHeadStackHeight(for count: Int) -> CGFloat {
+    private func collapsedHeadStackLength(for count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return DesignTokens.headControlDiameter * CGFloat(count)
             + CGFloat(count - 1) * headSpacing

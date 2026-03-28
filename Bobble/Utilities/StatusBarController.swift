@@ -115,12 +115,14 @@ private final class UsageMenuRowView: NSView {
 
 final class StatusBarController: NSObject, NSMenuDelegate {
     var onSelectProvider: ((CLIBackend) -> Void)?
+    var onSelectLayoutMode: ((ChatHeadsLayoutMode) -> Void)?
     var onQuit: (() -> Void)?
 
     private let usageMonitor: UsageMonitor
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var providerMenuItems: [CLIBackend: NSMenuItem] = [:]
+    private var layoutMenuItems: [ChatHeadsLayoutMode: NSMenuItem] = [:]
     private var usageMenuItems: [CLIBackend: UsageMenuItemGroup] = [:]
     private var refreshUsageMenuItem: NSMenuItem?
     private var isRefreshingUsage = false
@@ -130,7 +132,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         super.init()
     }
 
-    func install(selectedProvider: CLIBackend) {
+    func install(selectedProvider: CLIBackend, selectedLayoutMode: ChatHeadsLayoutMode) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
             button.image = makeStatusBarIcon()
@@ -141,6 +143,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusMenu = menu
         statusItem?.menu = menu
         updateSelectedProvider(selectedProvider)
+        updateSelectedLayoutMode(selectedLayoutMode)
         refreshUsage()
     }
 
@@ -150,6 +153,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
 
         statusItem?.button?.toolTip = "Bobble (\(provider.displayName))"
+    }
+
+    func updateSelectedLayoutMode(_ layoutMode: ChatHeadsLayoutMode) {
+        for (candidate, item) in layoutMenuItems {
+            item.state = candidate == layoutMode ? .on : .off
+        }
     }
 
     func refreshUsage(force: Bool = false) {
@@ -214,6 +223,26 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(providerRoot)
         menu.addItem(.separator())
 
+        let layoutRoot = NSMenuItem(title: "Layout", action: nil, keyEquivalent: "")
+        let layoutSubmenu = NSMenu()
+        layoutMenuItems.removeAll()
+
+        for layoutMode in ChatHeadsLayoutMode.allCases {
+            let item = NSMenuItem(
+                title: layoutMode.menuTitle,
+                action: #selector(selectLayoutMode(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = layoutMode.rawValue
+            layoutMenuItems[layoutMode] = item
+            layoutSubmenu.addItem(item)
+        }
+
+        layoutRoot.submenu = layoutSubmenu
+        menu.addItem(layoutRoot)
+        menu.addItem(.separator())
+
         let usageHeader = NSMenuItem(title: "Usage", action: nil, keyEquivalent: "")
         usageHeader.isEnabled = false
         menu.addItem(usageHeader)
@@ -254,6 +283,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
 
         onSelectProvider?(provider)
+    }
+
+    @objc private func selectLayoutMode(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let layoutMode = ChatHeadsLayoutMode(rawValue: rawValue) else {
+            return
+        }
+
+        onSelectLayoutMode?(layoutMode)
     }
 
     @objc private func refreshUsageMenuAction(_ sender: Any?) {

@@ -23,6 +23,13 @@ class ChatHeadsManager: ObservableObject {
             onSelectedProviderChanged?(selectedProvider)
         }
     }
+    @Published var layoutMode: ChatHeadsLayoutMode = .vertical {
+        didSet {
+            guard oldValue != layoutMode else { return }
+            userDefaults.set(layoutMode.rawValue, forKey: Self.layoutModeDefaultsKey)
+            onLayoutModeChanged?(layoutMode)
+        }
+    }
     @Published var panelDockSide: PanelDockSide = .trailing
     @Published var availableBackends: Set<CLIBackend> = []
     @Published var morphOriginY: CGFloat = 240
@@ -31,12 +38,22 @@ class ChatHeadsManager: ObservableObject {
     var onSessionsChanged: ((Int) -> Void)?
     var onSessionAdded: ((ChatSession) -> Void)?
     var onSelectedProviderChanged: ((CLIBackend) -> Void)?
+    var onLayoutModeChanged: ((ChatHeadsLayoutMode) -> Void)?
+
+    static let layoutModeDefaultsKey = "chatHeadsLayoutMode"
 
     private var viewModels: [UUID: ChatSessionViewModel] = [:]
     private let historyStore = ChatHistoryStore()
+    private let userDefaults: UserDefaults
     private var pendingPersistenceWorkItem: DispatchWorkItem?
 
-    init() {
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+        if let storedLayoutMode = ChatHeadsLayoutMode(rawValue: userDefaults.string(forKey: Self.layoutModeDefaultsKey) ?? "") {
+            layoutMode = storedLayoutMode
+        } else {
+            layoutMode = .vertical
+        }
         restoreSessions()
         detectAvailableBackends()
     }
@@ -162,6 +179,11 @@ class ChatHeadsManager: ObservableObject {
 
         guard let sessionId = activeSessionId else { return }
         setProvider(provider, for: sessionId)
+    }
+
+    func updateLayoutMode(_ mode: ChatHeadsLayoutMode) {
+        guard layoutMode != mode else { return }
+        layoutMode = mode
     }
 
     func setProvider(_ provider: CLIBackend, for sessionId: UUID) {
