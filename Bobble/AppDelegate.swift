@@ -24,14 +24,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController.onSelectProvider = { [weak self] provider in
             self?.manager.updateSelectedProvider(provider)
         }
+        statusBarController.onSelectLayoutMode = { [weak self] layoutMode in
+            self?.applyLayoutMode(layoutMode)
+        }
         statusBarController.onQuit = { [weak self] in
             self?.quitApp()
         }
-        statusBarController.install(selectedProvider: manager.selectedProvider)
+        statusBarController.install(
+            selectedProvider: manager.selectedProvider,
+            selectedLayoutMode: manager.layoutMode
+        )
 
         manager.onSelectedProviderChanged = { [weak self] provider in
             DispatchQueue.main.async {
                 self?.statusBarController.updateSelectedProvider(provider)
+            }
+        }
+        manager.onLayoutModeChanged = { [weak self] layoutMode in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.statusBarController.updateSelectedLayoutMode(layoutMode)
+                self.handleSessionsChanged()
             }
         }
     }
@@ -71,7 +84,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panelCoordinator.onWindowCloseRequested = { [weak self] in
             self?.collapseSession()
         }
-        panelCoordinator.install(rootView: AnyView(rootView))
+        panelCoordinator.install(
+            rootView: AnyView(rootView),
+            layoutMode: manager.layoutMode
+        )
 
         manager.onSessionsChanged = { [weak self] _ in
             DispatchQueue.main.async {
@@ -100,6 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panelCoordinator.expand(
             sessionCount: manager.sessions.count,
             expandedIndex: expandedIndex,
+            layoutMode: manager.layoutMode,
             animateStateChange: animateStateChange
         ) { [weak self] in
             self?.manager.expandedSessionId = session.id
@@ -108,7 +125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func collapseSession() {
         guard manager.expandedSessionId != nil, !panelCoordinator.isCollapsingSession else { return }
-        panelCoordinator.collapse(sessionCount: manager.sessions.count) { [weak self] in
+        panelCoordinator.collapse(sessionCount: manager.sessions.count, layoutMode: manager.layoutMode) { [weak self] in
             self?.manager.expandedSessionId = nil
         }
     }
@@ -119,7 +136,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panelCoordinator.handleSessionsChanged(
             sessionCount: manager.sessions.count,
-            expandedIndex: expandedIndex
+            expandedIndex: expandedIndex,
+            layoutMode: manager.layoutMode
         )
     }
 
@@ -136,7 +154,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panelCoordinator.isCollapsingSession = true
 
         let remainingCount = max(manager.sessions.count - 1, 0)
-        let size = panelCoordinator.collapsedPanelSize(count: remainingCount)
+        let size = panelCoordinator.collapsedPanelSize(
+            count: remainingCount,
+            layoutMode: manager.layoutMode
+        )
 
         withAnimation(DesignTokens.motionLayout) {
             manager.deletingSessionId = session.id
@@ -147,7 +168,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             self.panelCoordinator.suppressNextPanelSizeUpdate = true
             self.manager.archiveSession(session)
-            self.panelCoordinator.applyCollapsedFrame(sessionCount: self.manager.sessions.count)
+            self.panelCoordinator.applyCollapsedFrame(
+                sessionCount: self.manager.sessions.count,
+                layoutMode: self.manager.layoutMode
+            )
             self.panelCoordinator.isCollapsingSession = false
         }
     }
@@ -174,9 +198,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
         panelCoordinator.focusExpandedSession(
             sessionCount: manager.sessions.count,
-            expandedIndex: expandedIndex
+            expandedIndex: expandedIndex,
+            layoutMode: manager.layoutMode
         ) { [weak self] in
             self?.manager.expandedSessionId = session.id
+        }
+    }
+
+    private func applyLayoutMode(_ layoutMode: ChatHeadsLayoutMode) {
+        guard manager.layoutMode != layoutMode else { return }
+        withAnimation(DesignTokens.motionLayout) {
+            manager.updateLayoutMode(layoutMode)
         }
     }
 

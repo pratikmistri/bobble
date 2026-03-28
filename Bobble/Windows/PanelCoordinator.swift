@@ -34,8 +34,8 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         super.init()
     }
 
-    func install(rootView: AnyView) {
-        let size = positionManager.collapsedPanelSize(count: 0)
+    func install(rootView: AnyView, layoutMode: ChatHeadsLayoutMode) {
+        let size = positionManager.collapsedPanelSize(count: 0, layoutMode: layoutMode)
         mainPanel = FloatingPanel(
             contentView: rootView,
             size: size
@@ -50,21 +50,22 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         mainPanel.orderFrontRegardless()
     }
 
-    func collapsedPanelSize(count: Int) -> NSSize {
-        positionManager.collapsedPanelSize(count: count)
+    func collapsedPanelSize(count: Int, layoutMode: ChatHeadsLayoutMode) -> NSSize {
+        positionManager.collapsedPanelSize(count: count, layoutMode: layoutMode)
     }
 
-    func handleSessionsChanged(sessionCount: Int, expandedIndex: Int?) {
+    func handleSessionsChanged(sessionCount: Int, expandedIndex: Int?, layoutMode: ChatHeadsLayoutMode) {
         if suppressNextPanelSizeUpdate {
             suppressNextPanelSizeUpdate = false
             return
         }
-        updatePanelSize(sessionCount: sessionCount, expandedIndex: expandedIndex)
+        updatePanelSize(sessionCount: sessionCount, expandedIndex: expandedIndex, layoutMode: layoutMode)
     }
 
     func expand(
         sessionCount: Int,
         expandedIndex: Int?,
+        layoutMode: ChatHeadsLayoutMode,
         animateStateChange: Bool = true,
         stateChange: @escaping () -> Void
     ) {
@@ -72,7 +73,8 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
 
         let size = positionManager.expandedPanelSize(
             headsCount: sessionCount,
-            expandedIndex: expandedIndex
+            expandedIndex: expandedIndex,
+            layoutMode: layoutMode
         )
         let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
         panelAnchor = finalState.anchor
@@ -90,11 +92,16 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         }
     }
 
-    func collapse(sessionCount: Int, stateChange: @escaping () -> Void, completion: (() -> Void)? = nil) {
+    func collapse(
+        sessionCount: Int,
+        layoutMode: ChatHeadsLayoutMode,
+        stateChange: @escaping () -> Void,
+        completion: (() -> Void)? = nil
+    ) {
         stopPhysics()
         isCollapsingSession = true
 
-        let size = positionManager.collapsedPanelSize(count: max(sessionCount, 1))
+        let size = positionManager.collapsedPanelSize(count: max(sessionCount, 1), layoutMode: layoutMode)
         withAnimation(DesignTokens.motionLayout) {
             stateChange()
         }
@@ -108,11 +115,13 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
     func focusExpandedSession(
         sessionCount: Int,
         expandedIndex: Int?,
+        layoutMode: ChatHeadsLayoutMode,
         stateChange: @escaping () -> Void
     ) {
         let size = positionManager.expandedPanelSize(
             headsCount: max(sessionCount, 1),
-            expandedIndex: expandedIndex
+            expandedIndex: expandedIndex,
+            layoutMode: layoutMode
         )
         let finalState = resolvedPanelState(for: size, selectingBestDockSide: true)
         panelAnchor = finalState.anchor
@@ -126,16 +135,17 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         }
     }
 
-    func updatePanelSize(sessionCount: Int, expandedIndex: Int?) {
+    func updatePanelSize(sessionCount: Int, expandedIndex: Int?, layoutMode: ChatHeadsLayoutMode) {
         stopPhysics()
         let size: NSSize
         if expandedIndex != nil {
             size = positionManager.expandedPanelSize(
                 headsCount: max(sessionCount, 1),
-                expandedIndex: expandedIndex
+                expandedIndex: expandedIndex,
+                layoutMode: layoutMode
             )
         } else {
-            size = positionManager.collapsedPanelSize(count: sessionCount)
+            size = positionManager.collapsedPanelSize(count: sessionCount, layoutMode: layoutMode)
         }
         animatePanelFrame(to: size, duration: 0.35)
     }
@@ -189,8 +199,8 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         }
     }
 
-    func applyCollapsedFrame(sessionCount: Int) {
-        let finalSize = positionManager.collapsedPanelSize(count: sessionCount)
+    func applyCollapsedFrame(sessionCount: Int, layoutMode: ChatHeadsLayoutMode) {
+        let finalSize = positionManager.collapsedPanelSize(count: sessionCount, layoutMode: layoutMode)
         panelAnchor = positionManager.constrainedPanelAnchor(
             preferredPanelAnchor,
             for: finalSize,

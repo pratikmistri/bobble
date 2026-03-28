@@ -21,6 +21,8 @@ struct BobbleRootView: View {
 
     private var isExpanded: Bool { manager.expandedSessionId != nil }
     private var dockSide: PanelDockSide { manager.panelDockSide }
+    private var layoutMode: ChatHeadsLayoutMode { manager.layoutMode }
+    private var isHorizontalLayout: Bool { layoutMode == .horizontal }
     private var headVisualPadding: CGFloat { DesignTokens.headVisualPadding }
 
     private var expandedSession: ChatSession? {
@@ -48,21 +50,53 @@ struct BobbleRootView: View {
     private var collapsedHeadsRenderHeight: CGFloat {
         let count = manager.sessions.count
         guard count > 0 else { return 0 }
-        let collapsedFrameHeight = CGFloat(count) * DesignTokens.headControlDiameter
+        if isHorizontalLayout {
+            return DesignTokens.headControlDiameter
+        }
+        return CGFloat(count) * DesignTokens.headControlDiameter
             + CGFloat(count - 1) * DesignTokens.headSpacing
-        return collapsedFrameHeight
+    }
+
+    private var collapsedHeadsRenderWidth: CGFloat {
+        let count = manager.sessions.count
+        guard count > 0 else { return 0 }
+        if isHorizontalLayout {
+            return CGFloat(count) * DesignTokens.headControlDiameter
+                + CGFloat(count - 1) * DesignTokens.headSpacing
+        }
+        return headsRenderWidth
     }
 
     private var headsRenderWidth: CGFloat {
         DesignTokens.headDiameter + (headVisualPadding * 2)
     }
 
+    private var controlItemWidth: CGFloat {
+        isHorizontalLayout ? DesignTokens.headControlDiameter : headsRenderWidth
+    }
+
     private var headColumnAlignment: Alignment {
         dockSide == .trailing ? .topTrailing : .topLeading
     }
 
+    private var headsStackAlignment: Alignment {
+        isHorizontalLayout ? .topLeading : headColumnAlignment
+    }
+
     private var headButtonFrameAlignment: Alignment {
-        dockSide == .trailing ? .trailing : .leading
+        isHorizontalLayout ? .center : (dockSide == .trailing ? .trailing : .leading)
+    }
+
+    private var controlsLayout: AnyLayout {
+        if isHorizontalLayout {
+            return AnyLayout(HStackLayout(alignment: .bottom, spacing: DesignTokens.headSpacing))
+        }
+        return AnyLayout(
+            VStackLayout(
+                alignment: dockSide == .trailing ? .trailing : .leading,
+                spacing: DesignTokens.headSpacing
+            )
+        )
     }
 
     private var headsLayoutAnimation: Animation? {
@@ -70,15 +104,26 @@ struct BobbleRootView: View {
         return isTransitioning ? nil : DesignTokens.motionLayout
     }
 
-    private func collapsedHeadYOffset(for index: Int) -> CGFloat {
-        CGFloat(index) * (DesignTokens.headControlDiameter + DesignTokens.headSpacing)
+    private func collapsedHeadOffset(for index: Int) -> CGSize {
+        let step = CGFloat(index) * (DesignTokens.headControlDiameter + DesignTokens.headSpacing)
+        if isHorizontalLayout {
+            return CGSize(width: step, height: 0)
+        }
+        return CGSize(width: 0, height: step)
     }
 
-    private func cardStackHeight(for count: Int) -> CGFloat {
+    private func cardStackLength(for count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return DesignTokens.headDiameter
             + CGFloat(count - 1) * DesignTokens.deckOffset
             + headVisualPadding
+    }
+
+    private func cardStackSize(for count: Int) -> CGSize {
+        if isHorizontalLayout {
+            return CGSize(width: cardStackLength(for: count), height: DesignTokens.headControlDiameter)
+        }
+        return CGSize(width: headsRenderWidth, height: cardStackLength(for: count))
     }
 
     private var headsDragGesture: some Gesture {
@@ -99,10 +144,7 @@ struct BobbleRootView: View {
                         .allowsHitTesting(false)
                 }
 
-                VStack(
-                    alignment: dockSide == .trailing ? .trailing : .leading,
-                    spacing: DesignTokens.headSpacing
-                ) {
+                controlsLayout {
                     addButton
                         .contentShape(Rectangle())
                         .simultaneousGesture(headsDragGesture)
@@ -122,6 +164,7 @@ struct BobbleRootView: View {
                     }
                 }
                 .padding(DesignTokens.headInset)
+                .animation(headsLayoutAnimation, value: layoutMode)
 
                 if dockSide == .leading {
                     Spacer(minLength: 0)
@@ -182,14 +225,18 @@ struct BobbleRootView: View {
         historyButton
 
         if !manager.sessions.isEmpty {
-            ZStack(alignment: headColumnAlignment) {
+            ZStack(alignment: headsStackAlignment) {
                 ForEach(Array(manager.sessions.enumerated()), id: \.element.id) { index, session in
                     chatHeadButton(for: session)
-                        .offset(y: collapsedHeadYOffset(for: index))
+                        .offset(collapsedHeadOffset(for: index))
                         .zIndex(Double(manager.sessions.count - index))
                 }
             }
-            .frame(width: headsRenderWidth, height: collapsedHeadsRenderHeight, alignment: headColumnAlignment)
+            .frame(
+                width: collapsedHeadsRenderWidth,
+                height: collapsedHeadsRenderHeight,
+                alignment: headsStackAlignment
+            )
             .animation(headsLayoutAnimation, value: manager.sessions.count)
             .animation(headsLayoutAnimation, value: isExpanded)
         }
@@ -224,14 +271,21 @@ struct BobbleRootView: View {
 
     @ViewBuilder
     private func stackedHeadButtonsView(sessions: [ChatSession]) -> some View {
-        ZStack(alignment: headColumnAlignment) {
+        ZStack(alignment: headsStackAlignment) {
             ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
                 chatHeadButton(for: session)
-                    .offset(y: CGFloat(index) * DesignTokens.deckOffset)
+                    .offset(
+                        x: isHorizontalLayout ? CGFloat(index) * DesignTokens.deckOffset : 0,
+                        y: isHorizontalLayout ? 0 : CGFloat(index) * DesignTokens.deckOffset
+                    )
                     .zIndex(Double(sessions.count - index))
             }
         }
-        .frame(width: headsRenderWidth, height: cardStackHeight(for: sessions.count), alignment: headColumnAlignment)
+        .frame(
+            width: cardStackSize(for: sessions.count).width,
+            height: cardStackSize(for: sessions.count).height,
+            alignment: headsStackAlignment
+        )
     }
 
     private func chatHeadButton(for session: ChatSession) -> some View {
@@ -249,7 +303,7 @@ struct BobbleRootView: View {
             },
             morphNamespace: morphNamespace
         )
-        .frame(width: headsRenderWidth, alignment: headButtonFrameAlignment)
+        .frame(width: controlItemWidth, alignment: headButtonFrameAlignment)
     }
 
     @ViewBuilder
@@ -323,7 +377,7 @@ struct BobbleRootView: View {
                 .buttonStyle(.plain)
             }
         }
-        .frame(width: headsRenderWidth, alignment: headButtonFrameAlignment)
+        .frame(width: controlItemWidth, alignment: headButtonFrameAlignment)
         .accessibilityLabel(accessibilityLabel)
     }
 }
