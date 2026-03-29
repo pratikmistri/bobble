@@ -50,4 +50,34 @@ final class WindowPositionManagerLayoutTests: XCTestCase {
             XCTAssertGreaterThan(expandedOne.height, 0)
         }
     }
+
+    func testHorizontalCollapsedSizeCapsVisibleHeads() {
+        let cappedCount = DesignTokens.maxHorizontalCollapsedVisibleHeads
+        let atCap = positionManager.collapsedPanelSize(count: cappedCount, layoutMode: .horizontal)
+        let aboveCap = positionManager.collapsedPanelSize(count: cappedCount + 40, layoutMode: .horizontal)
+
+        XCTAssertEqual(aboveCap.width, atCap.width, accuracy: 0.001)
+        XCTAssertEqual(aboveCap.height, atCap.height, accuracy: 0.001)
+    }
+
+    func testHorizontalExpandedSizeCapsDeckHeadsPerSide() {
+        let cap = DesignTokens.maxHorizontalExpandedDeckHeadsPerSide
+        let baselineHeadsCount = (cap * 2) + 1
+        let baselineExpandedIndex = cap
+
+        let baseline = positionManager.expandedPanelSize(
+            headsCount: baselineHeadsCount,
+            expandedIndex: baselineExpandedIndex,
+            layoutMode: .horizontal
+        )
+
+        let oversized = positionManager.expandedPanelSize(
+            headsCount: 200,
+            expandedIndex: 100,
+            layoutMode: .horizontal
+        )
+
+        XCTAssertEqual(oversized.width, baseline.width, accuracy: 0.001)
+        XCTAssertEqual(oversized.height, baseline.height, accuracy: 0.001)
+    }
 }

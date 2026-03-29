@@ -14,6 +14,23 @@ struct WindowPositionManager {
     private let chatHeight: CGFloat = 480
     private let leadingOverflow: CGFloat = DesignTokens.headPreviewOverflow
     private let headDockInset: CGFloat = DesignTokens.headInset + DesignTokens.headVisualPadding
+    private var maxReasonableExpandedHorizontalWidth: CGFloat {
+        let inset = DesignTokens.headInset * 2
+        let controlWidth = DesignTokens.headControlDiameter
+        let maxDeckHeadsPerSide = DesignTokens.maxHorizontalExpandedDeckHeadsPerSide
+        let leftDeck = deckStackLength(for: maxDeckHeadsPerSide)
+        let rightDeck = deckStackLength(for: maxDeckHeadsPerSide)
+        let interColumnSpacing = DesignTokens.headSpacing * 4 // add + history + left deck + chat + right deck
+
+        return inset
+            + controlWidth
+            + controlWidth
+            + leftDeck
+            + chatWidth
+            + rightDeck
+            + interColumnSpacing
+            + leadingOverflow
+    }
 
     // MARK: - Collapsed state (just heads)
 
@@ -28,8 +45,8 @@ struct WindowPositionManager {
 
     private func collapsedPanelSizeVertical(count: Int) -> NSSize {
         let inset = DesignTokens.headInset * 2
-        let addControlHeight = headDiameter
-        let historyControlHeight = headDiameter
+        let addControlHeight = DesignTokens.headControlDiameter
+        let historyControlHeight = DesignTokens.headControlDiameter
         let headStackHeight = collapsedHeadStackLength(for: count)
 
         var rows: [CGFloat] = [addControlHeight, historyControlHeight]
@@ -54,7 +71,8 @@ struct WindowPositionManager {
         let controlWidth = DesignTokens.headControlDiameter
         let addControlWidth = controlWidth
         let historyControlWidth = controlWidth
-        let headStackWidth = collapsedHeadStackLength(for: count)
+        let visibleHeadsCount = min(max(count, 0), DesignTokens.maxHorizontalCollapsedVisibleHeads)
+        let headStackWidth = collapsedHeadStackLength(for: visibleHeadsCount)
 
         var columns: [CGFloat] = [addControlWidth, historyControlWidth]
         if headStackWidth > 0 {
@@ -96,8 +114,8 @@ struct WindowPositionManager {
         let aboveCount = clampedExpandedIndex ?? 0
         let belowCount = clampedExpandedIndex.map { max(stackCount - $0 - 1, 0) } ?? 0
 
-        let addH = headDiameter
-        let historyH = headDiameter
+        let addH = DesignTokens.headControlDiameter
+        let historyH = DesignTokens.headControlDiameter
         let topStackCount = aboveCount
         let bottomStackCount = belowCount
 
@@ -129,18 +147,20 @@ struct WindowPositionManager {
         }()
         let beforeCount = clampedExpandedIndex ?? 0
         let afterCount = clampedExpandedIndex.map { max(stackCount - $0 - 1, 0) } ?? 0
+        let visibleBeforeCount = min(beforeCount, DesignTokens.maxHorizontalExpandedDeckHeadsPerSide)
+        let visibleAfterCount = min(afterCount, DesignTokens.maxHorizontalExpandedDeckHeadsPerSide)
 
         let controlWidth = DesignTokens.headControlDiameter
         var columns: [CGFloat] = [controlWidth, controlWidth]
 
-        let beforeStackWidth = deckStackLength(for: beforeCount)
+        let beforeStackWidth = deckStackLength(for: visibleBeforeCount)
         if beforeStackWidth > 0 {
             columns.append(beforeStackWidth)
         }
 
         columns.append(chatWidth)
 
-        let afterStackWidth = deckStackLength(for: afterCount)
+        let afterStackWidth = deckStackLength(for: visibleAfterCount)
         if afterStackWidth > 0 {
             columns.append(afterStackWidth)
         }
@@ -165,7 +185,8 @@ struct WindowPositionManager {
         let minHeight = (headDiameter * 2) + headSpacing + (DesignTokens.headInset * 2)
         let minWidth = headDiameter + (DesignTokens.headInset * 2) + leadingOverflow
         let maxHeight = max(frame.height, minHeight)
-        let maxWidth = max(frame.width + leadingOverflow, minWidth)
+        let maxScreenBoundedWidth = max(frame.width + leadingOverflow, minWidth)
+        let maxWidth = min(maxScreenBoundedWidth, maxReasonableExpandedHorizontalWidth)
 
         return NSSize(
             width: min(size.width, maxWidth),

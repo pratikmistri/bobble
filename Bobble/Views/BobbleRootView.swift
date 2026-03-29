@@ -18,6 +18,8 @@ struct BobbleRootView: View {
     private let chatWidth: CGFloat = 320
     private let chatHeight: CGFloat = 480
     private let previewOverflow: CGFloat = DesignTokens.headPreviewOverflow
+    private let maxHorizontalCollapsedVisibleHeads = DesignTokens.maxHorizontalCollapsedVisibleHeads
+    private let maxHorizontalExpandedDeckHeadsPerSide = DesignTokens.maxHorizontalExpandedDeckHeadsPerSide
 
     private var isExpanded: Bool { manager.expandedSessionId != nil }
     private var dockSide: PanelDockSide { manager.panelDockSide }
@@ -37,18 +39,27 @@ struct BobbleRootView: View {
 
     private var expandedTopSessions: [ChatSession] {
         guard let expandedSessionIndex else { return [] }
-        return Array(manager.sessions.prefix(expandedSessionIndex))
+        let allTopSessions = Array(manager.sessions.prefix(expandedSessionIndex))
+        guard isHorizontalLayout else { return allTopSessions }
+        return Array(allTopSessions.suffix(maxHorizontalExpandedDeckHeadsPerSide))
     }
 
     private var expandedBottomSessions: [ChatSession] {
         guard let expandedSessionIndex else { return [] }
         let nextIndex = manager.sessions.index(after: expandedSessionIndex)
         guard nextIndex < manager.sessions.endIndex else { return [] }
-        return Array(manager.sessions[nextIndex...])
+        let allBottomSessions = Array(manager.sessions[nextIndex...])
+        guard isHorizontalLayout else { return allBottomSessions }
+        return Array(allBottomSessions.prefix(maxHorizontalExpandedDeckHeadsPerSide))
+    }
+
+    private var collapsedVisibleSessions: [ChatSession] {
+        guard isHorizontalLayout else { return manager.sessions }
+        return Array(manager.sessions.suffix(maxHorizontalCollapsedVisibleHeads))
     }
 
     private var collapsedHeadsRenderHeight: CGFloat {
-        let count = manager.sessions.count
+        let count = collapsedVisibleSessions.count
         guard count > 0 else { return 0 }
         if isHorizontalLayout {
             return DesignTokens.headControlDiameter
@@ -58,7 +69,7 @@ struct BobbleRootView: View {
     }
 
     private var collapsedHeadsRenderWidth: CGFloat {
-        let count = manager.sessions.count
+        let count = collapsedVisibleSessions.count
         guard count > 0 else { return 0 }
         if isHorizontalLayout {
             return CGFloat(count) * DesignTokens.headControlDiameter
@@ -73,6 +84,14 @@ struct BobbleRootView: View {
 
     private var controlItemWidth: CGFloat {
         isHorizontalLayout ? DesignTokens.headControlDiameter : headsRenderWidth
+    }
+
+    private var actionButtonShadowPadding: CGFloat {
+        isHorizontalLayout ? 0 : (DesignTokens.headVisualPadding / 2)
+    }
+
+    private var actionButtonRenderHeight: CGFloat {
+        DesignTokens.headDiameter + (actionButtonShadowPadding * 2)
     }
 
     private var headColumnAlignment: Alignment {
@@ -224,12 +243,12 @@ struct BobbleRootView: View {
     private var collapsedContent: some View {
         historyButton
 
-        if !manager.sessions.isEmpty {
+        if !collapsedVisibleSessions.isEmpty {
             ZStack(alignment: headsStackAlignment) {
-                ForEach(Array(manager.sessions.enumerated()), id: \.element.id) { index, session in
+                ForEach(Array(collapsedVisibleSessions.enumerated()), id: \.element.id) { index, session in
                     chatHeadButton(for: session)
                         .offset(collapsedHeadOffset(for: index))
-                        .zIndex(Double(manager.sessions.count - index))
+                        .zIndex(Double(collapsedVisibleSessions.count - index))
                 }
             }
             .frame(
@@ -237,7 +256,7 @@ struct BobbleRootView: View {
                 height: collapsedHeadsRenderHeight,
                 alignment: headsStackAlignment
             )
-            .animation(headsLayoutAnimation, value: manager.sessions.count)
+            .animation(headsLayoutAnimation, value: collapsedVisibleSessions.count)
             .animation(headsLayoutAnimation, value: isExpanded)
         }
     }
@@ -363,6 +382,7 @@ struct BobbleRootView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(DesignTokens.textPrimary)
                         .frame(width: DesignTokens.headDiameter, height: DesignTokens.headDiameter)
+                        .padding(actionButtonShadowPadding)
                 }
                 .buttonStyle(.glass(.regular.interactive()))
                 .buttonBorderShape(.circle)
@@ -373,11 +393,16 @@ struct BobbleRootView: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(DesignTokens.textPrimary)
                     }
+                    .padding(actionButtonShadowPadding)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .frame(width: controlItemWidth, alignment: headButtonFrameAlignment)
+        .frame(
+            width: controlItemWidth,
+            height: actionButtonRenderHeight,
+            alignment: headButtonFrameAlignment
+        )
         .accessibilityLabel(accessibilityLabel)
     }
 }

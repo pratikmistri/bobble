@@ -14,6 +14,8 @@ enum DesignTokens {
     static let headPreviewGap: CGFloat = 14
     static let headPreviewOverflow: CGFloat = 250
     static let deckOffset: CGFloat = 14
+    static let maxHorizontalCollapsedVisibleHeads: Int = 18
+    static let maxHorizontalExpandedDeckHeadsPerSide: Int = 12
     static let screenMargin: CGFloat = 16
     static let cornerRadius: CGFloat = 16
     static let messageBubbleRadius: CGFloat = 14

@@ -80,14 +80,16 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         panelAnchor = finalState.anchor
         dockSide = finalState.dockSide
         performPanelLayoutMutation {
-            self.mainPanel.setFrame(finalState.frame, display: true)
+            self.mainPanel.setFrame(finalState.frame, display: false)
 
-            if animateStateChange {
-                withAnimation(DesignTokens.motionLayout) {
+            DispatchQueue.main.async {
+                if animateStateChange {
+                    withAnimation(DesignTokens.motionLayout) {
+                        stateChange()
+                    }
+                } else {
                     stateChange()
                 }
-            } else {
-                stateChange()
             }
         }
     }
@@ -116,6 +118,7 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         sessionCount: Int,
         expandedIndex: Int?,
         layoutMode: ChatHeadsLayoutMode,
+        animateStateChange: Bool = true,
         stateChange: @escaping () -> Void
     ) {
         let size = positionManager.expandedPanelSize(
@@ -127,10 +130,15 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         panelAnchor = finalState.anchor
         dockSide = finalState.dockSide
         performPanelLayoutMutation {
-            self.mainPanel.setFrame(finalState.frame, display: true)
-
-            withAnimation(DesignTokens.motionLayout) {
-                stateChange()
+            self.mainPanel.setFrame(finalState.frame, display: false)
+            DispatchQueue.main.async {
+                if animateStateChange {
+                    withAnimation(DesignTokens.motionLayout) {
+                        stateChange()
+                    }
+                } else {
+                    stateChange()
+                }
             }
         }
     }

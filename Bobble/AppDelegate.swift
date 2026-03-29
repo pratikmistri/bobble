@@ -113,11 +113,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func expandSession(_ session: ChatSession, animateStateChange: Bool = true) {
         let expandedIndex = manager.sessions.firstIndex(where: { $0.id == session.id })
+        let shouldAnimateStateChange = animateStateChange && !session.messages.isEmpty
         panelCoordinator.expand(
             sessionCount: manager.sessions.count,
             expandedIndex: expandedIndex,
             layoutMode: manager.layoutMode,
-            animateStateChange: animateStateChange
+            animateStateChange: shouldAnimateStateChange
         ) { [weak self] in
             self?.manager.expandedSessionId = session.id
         }
@@ -199,7 +200,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panelCoordinator.focusExpandedSession(
             sessionCount: manager.sessions.count,
             expandedIndex: expandedIndex,
-            layoutMode: manager.layoutMode
+            layoutMode: manager.layoutMode,
+            animateStateChange: !session.messages.isEmpty
         ) { [weak self] in
             self?.manager.expandedSessionId = session.id
         }
