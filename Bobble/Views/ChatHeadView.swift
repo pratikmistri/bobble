@@ -357,46 +357,54 @@ struct ChatHeadView: View {
 
     private func updateAttentionAnimation(previous: HeadAttentionTrigger?, current: HeadAttentionTrigger?) {
         guard previous != current else { return }
-        guard current != nil else {
+        guard let current else {
             stopAttentionAnimation()
             return
         }
 
         // The attention jump should take over the motion language and end at rest.
         stopWorkingAnimation()
-        startAttentionAnimation()
+        startAttentionAnimation(trigger: current)
     }
 
-    private func startAttentionAnimation() {
+    private func startAttentionAnimation(trigger: HeadAttentionTrigger) {
         attentionTask?.cancel()
         resetAttentionTransform()
+        let jumpCycles = trigger == .completed ? 3 : 1
 
         attentionTask = Task { @MainActor in
             // Defensive reset in case a repeat-forever bobble transaction is still active.
             stopWorkingAnimation()
 
-            withAnimation(.spring(response: 0.20, dampingFraction: 0.78)) {
-                attentionJumpOffset = -7
-                attentionSquishX = 0.96
-                attentionSquishY = 1.04
-            }
+            for cycle in 0..<jumpCycles {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                    attentionJumpOffset = -12
+                    attentionSquishX = 0.96
+                    attentionSquishY = 1.04
+                }
 
-            try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
+                try? await Task.sleep(for: .milliseconds(220))
+                guard !Task.isCancelled else { return }
 
-            withAnimation(.spring(response: 0.16, dampingFraction: 0.60)) {
-                attentionJumpOffset = 2
-                attentionSquishX = 1.05
-                attentionSquishY = 0.95
-            }
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.68)) {
+                    attentionJumpOffset = 4
+                    attentionSquishX = 1.05
+                    attentionSquishY = 0.95
+                }
 
-            try? await Task.sleep(for: .milliseconds(130))
-            guard !Task.isCancelled else { return }
+                try? await Task.sleep(for: .milliseconds(240))
+                guard !Task.isCancelled else { return }
 
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                attentionJumpOffset = 0
-                attentionSquishX = 1
-                attentionSquishY = 1
+                withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+                    attentionJumpOffset = 0
+                    attentionSquishX = 1
+                    attentionSquishY = 1
+                }
+
+                if cycle < (jumpCycles - 1) {
+                    try? await Task.sleep(for: .milliseconds(3000))
+                    guard !Task.isCancelled else { return }
+                }
             }
 
             // Keep the head settled after the completion jump.

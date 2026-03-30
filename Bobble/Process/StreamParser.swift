@@ -5,6 +5,8 @@ class StreamParser {
     private let backend: CLIBackend
     private var codexAccumulatedText = ""
     private var copilotAccumulatedText = ""
+    private var claudeDidStreamDelta = false
+    private var claudeDidEmitFinalResult = false
 
     var onTextDelta: ((String) -> Void)?
     var onResult: ((String) -> Void)?
@@ -100,7 +102,10 @@ class StreamParser {
 
         guard let type = json["type"] as? String else {
             if let result = json["result"] as? String {
-                onResult?(result)
+                if !claudeDidEmitFinalResult {
+                    claudeDidEmitFinalResult = true
+                    onResult?(result)
+                }
             }
             return
         }
@@ -121,38 +126,33 @@ class StreamParser {
         case "content_block_delta":
             if let delta = json["delta"] as? [String: Any],
                let text = delta["text"] as? String {
+                claudeDidStreamDelta = true
                 onTextDelta?(text)
             }
 
         case "assistant":
             // Claude Code stream-json: assistant message with content blocks
-            if let message = json["message"] as? [String: Any],
-               let content = message["content"] as? [[String: Any]] {
-                for block in content {
-                    if let text = block["text"] as? String {
-                        onTextDelta?(text)
-                    }
-                }
-            }
-            // Also handle top-level content array
-            if let content = json["content"] as? [[String: Any]] {
-                for block in content {
-                    if let text = block["text"] as? String {
-                        onTextDelta?(text)
-                    }
-                }
+            guard !claudeDidStreamDelta else { break }
+            let text = extractClaudeText(from: json)
+            guard !text.isEmpty else { break }
+            if !claudeDidEmitFinalResult {
+                claudeDidEmitFinalResult = true
+                onResult?(text)
             }
 
         case "result":
             if let result = json["result"] as? String {
-                onResult?(result)
+                if !claudeDidEmitFinalResult {
+                    claudeDidEmitFinalResult = true
+                    onResult?(result)
+                }
             }
             // Handle result with content blocks
-            if let content = json["content"] as? [[String: Any]] {
-                for block in content {
-                    if let text = block["text"] as? String {
-                        onResult?(text)
-                    }
+            if !claudeDidEmitFinalResult {
+                let text = extractClaudeText(from: json)
+                if !text.isEmpty {
+                    claudeDidEmitFinalResult = true
+                    onResult?(text)
                 }
             }
 
@@ -162,6 +162,21 @@ class StreamParser {
         default:
             break
         }
+    }
+
+    private func extractClaudeText(from payload: [String: Any]) -> String {
+        var pieces: [String] = []
+
+        if let message = payload["message"] as? [String: Any],
+           let content = message["content"] as? [[String: Any]] {
+            pieces.append(contentsOf: content.compactMap { $0["text"] as? String })
+        }
+
+        if let content = payload["content"] as? [[String: Any]] {
+            pieces.append(contentsOf: content.compactMap { $0["text"] as? String })
+        }
+
+        return pieces.joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func renderClaudeEvent(type: String, payload: [String: Any]) -> String? {

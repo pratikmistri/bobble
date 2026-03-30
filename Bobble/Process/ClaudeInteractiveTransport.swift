@@ -27,6 +27,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
     private var turnInFlight = false
     private var emittedAssistantMessageStart = false
     private var didStreamAssistantDelta = false
+    private var didEmitAssistantResult = false
     private var pendingInterruptionID: String?
     private var isStopping = false
     private var shouldIgnoreOutputUntilTurnEnds = false
@@ -69,6 +70,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
             self.pendingInterruptionID = nil
             self.emittedAssistantMessageStart = false
             self.didStreamAssistantDelta = false
+            self.didEmitAssistantResult = false
             self.shouldIgnoreOutputUntilTurnEnds = false
             self.writeUserMessage(text: textResponse)
         }
@@ -158,6 +160,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
         turnInFlight = true
         emittedAssistantMessageStart = false
         didStreamAssistantDelta = false
+        didEmitAssistantResult = false
         shouldIgnoreOutputUntilTurnEnds = false
         writeUserMessage(text: request.prompt)
     }
@@ -231,6 +234,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
         case "assistant":
             guard !shouldIgnoreOutputUntilTurnEnds else { return }
             guard !didStreamAssistantDelta,
+                  !didEmitAssistantResult,
                   let text = extractAssistantText(from: json),
                   !text.isEmpty else {
                 return
@@ -239,6 +243,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
                 emittedAssistantMessageStart = true
                 onAssistantMessageStarted?()
             }
+            didEmitAssistantResult = true
             onResult?(text)
 
         case "result":
@@ -247,6 +252,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
                 return
             }
             if !didStreamAssistantDelta,
+               !didEmitAssistantResult,
                let text = (json["result"] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                !text.isEmpty {
@@ -254,6 +260,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
                     emittedAssistantMessageStart = true
                     onAssistantMessageStarted?()
                 }
+                didEmitAssistantResult = true
                 onResult?(text)
             }
 
@@ -453,6 +460,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
         turnInFlight = false
         emittedAssistantMessageStart = false
         didStreamAssistantDelta = false
+        didEmitAssistantResult = false
         pendingInterruptionID = nil
         shouldIgnoreOutputUntilTurnEnds = false
     }
@@ -460,6 +468,7 @@ final class ClaudeInteractiveTransport: ConversationTransport {
     private func dispatchError(_ message: String) {
         turnInFlight = false
         pendingInterruptionID = nil
+        didEmitAssistantResult = false
         shouldIgnoreOutputUntilTurnEnds = false
         onError?(message)
     }
