@@ -14,7 +14,12 @@ struct ChatHeadView: View {
     @State private var isHovering = false
     @State private var isDropTargeted = false
     @State private var isShowingPreview = false
-    @State private var isHeadBobbling = false
+    @State private var workingAnimationTask: Task<Void, Never>?
+    @State private var workingBobblePhase: Double = 0
+    @State private var attentionJumpOffset: CGFloat = 0
+    @State private var attentionSquishX: CGFloat = 1
+    @State private var attentionSquishY: CGFloat = 1
+    @State private var attentionTask: Task<Void, Never>?
     @State private var previewTask: Task<Void, Never>?
     private let controlShellDiameter: CGFloat = DesignTokens.headControlDiameter
 
@@ -30,18 +35,22 @@ struct ChatHeadView: View {
                     anchor: dockSide == .trailing ? .bottomTrailing : .bottomLeading,
                     isSource: true
                 )
-                .scaleEffect(isWorking ? (isHeadBobbling ? 1.08 : 0.95) : 1.0)
-                .rotationEffect(.degrees(isWorking ? (isHeadBobbling ? 6 : -5) : 0))
-                .offset(y: isWorking ? (isHeadBobbling ? -2 : 2) : 0)
+                .scaleEffect(
+                    x: workingScaleX * attentionSquishX,
+                    y: workingScaleY * attentionSquishY,
+                    anchor: .bottom
+                )
+                .rotationEffect(.degrees(workingRotationDegrees))
+                .offset(x: workingXOffset, y: workingYOffset + attentionJumpOffset)
                 .shadow(
                     color: .black.opacity(isHighlighted ? 0.22 : 0.14),
                     radius: isHighlighted ? 10 : 5,
                     y: isHighlighted ? 4 : 2
                 )
                 .shadow(
-                    color: HeadStatus.working.color.opacity(isWorking ? (isHeadBobbling ? 0.42 : 0.18) : 0),
-                    radius: isWorking ? (isHeadBobbling ? 10 : 4) : 0,
-                    y: isWorking ? (isHeadBobbling ? 4 : 1) : 0
+                    color: HeadStatus.working.color.opacity(workingGlowOpacity),
+                    radius: workingGlowRadius,
+                    y: workingGlowYOffset
                 )
 
             // Selection ring — animated stroke
@@ -117,6 +126,9 @@ struct ChatHeadView: View {
         .onChange(of: headStatus) { _, _ in
             updateWorkingAnimation()
         }
+        .onChange(of: attentionTrigger) { previous, current in
+            updateAttentionAnimation(previous: previous, current: current)
+        }
         .onTapGesture {
             dismissPreview()
             onTap()
@@ -132,6 +144,7 @@ struct ChatHeadView: View {
         .onDisappear {
             dismissPreview()
             stopWorkingAnimation()
+            stopAttentionAnimation()
         }
         .contextMenu {
             Text(session.name)
@@ -142,7 +155,73 @@ struct ChatHeadView: View {
         headStatus == .working
     }
 
+    private var workingLiftProgress: CGFloat {
+        guard isWorking else { return 0 }
+        let wave = sin(workingBobblePhase - (.pi / 2))
+        return CGFloat((wave + 1) * 0.5)
+    }
+
+    private var workingCompressionProgress: CGFloat {
+        guard isWorking else { return 0 }
+        let wave = sin(workingBobblePhase + (.pi / 2))
+        return CGFloat((wave + 1) * 0.5)
+    }
+
+    private var workingScaleX: CGFloat {
+        guard isWorking else { return 1 }
+        return 1 + (0.05 * workingCompressionProgress) - (0.02 * workingLiftProgress)
+    }
+
+    private var workingScaleY: CGFloat {
+        guard isWorking else { return 1 }
+        return 1 - (0.04 * workingCompressionProgress) + (0.02 * workingLiftProgress)
+    }
+
+    private var workingRotationDegrees: Double {
+        guard isWorking else { return 0 }
+        let primary = sin(workingBobblePhase) * 2.0
+        let secondary = sin(workingBobblePhase * 0.5) * 1.0
+        return primary + secondary
+    }
+
+    private var workingXOffset: CGFloat {
+        guard isWorking else { return 0 }
+        return CGFloat(sin(workingBobblePhase * 0.5)) * 0.9
+    }
+
+    private var workingYOffset: CGFloat {
+        guard isWorking else { return 0 }
+        return 1.5 - (6.2 * workingLiftProgress)
+    }
+
+    private var workingGlowOpacity: Double {
+        guard isWorking else { return 0 }
+        return Double(0.16 + (0.24 * workingLiftProgress))
+    }
+
+    private var workingGlowRadius: CGFloat {
+        guard isWorking else { return 0 }
+        return 4 + (6 * workingLiftProgress)
+    }
+
+    private var workingGlowYOffset: CGFloat {
+        guard isWorking else { return 0 }
+        return 1 + (3 * workingLiftProgress)
+    }
+
+    private var hasPendingPermissionRequest: Bool {
+        session.messages.contains { message in
+            message.role == .system
+                && message.kind == .permission
+                && !message.interruptionActions.isEmpty
+        }
+    }
+
     private var headStatus: HeadStatus? {
+        if hasPendingPermissionRequest {
+            return .needsHelp
+        }
+
         switch session.state {
         case .running:
             return .working
@@ -162,6 +241,18 @@ struct ChatHeadView: View {
         case .completed:
             return .completed
         }
+    }
+
+    private var attentionTrigger: HeadAttentionTrigger? {
+        if hasPendingPermissionRequest {
+            return .permission
+        }
+
+        if headStatus == .completed {
+            return .completed
+        }
+
+        return nil
     }
 
     private var previewContent: ChatHeadPreviewContent? {
@@ -234,18 +325,98 @@ struct ChatHeadView: View {
     }
 
     private func startWorkingAnimation() {
-        guard !isHeadBobbling else { return }
-        isHeadBobbling = false
-        withAnimation(DesignTokens.motionPlayful.speed(1.05).repeatForever(autoreverses: true)) {
-            isHeadBobbling = true
+        guard workingAnimationTask == nil else { return }
+        workingBobblePhase = 0
+
+        workingAnimationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let fullCycleDuration = 0.64
+                let halfCycleDuration = fullCycleDuration * 0.5
+                withAnimation(.linear(duration: halfCycleDuration)) {
+                    // Advance by half-turns so rendered start/end values differ each step.
+                    workingBobblePhase += .pi
+                }
+                if workingBobblePhase > (.pi * 12) {
+                    workingBobblePhase.formTruncatingRemainder(dividingBy: (.pi * 2))
+                }
+                try? await Task.sleep(for: .milliseconds(Int(halfCycleDuration * 1000)))
+            }
         }
     }
 
     private func stopWorkingAnimation() {
+        workingAnimationTask?.cancel()
+        workingAnimationTask = nil
+
         var transaction = Transaction()
         transaction.animation = nil
         withTransaction(transaction) {
-            isHeadBobbling = false
+            workingBobblePhase = 0
+        }
+    }
+
+    private func updateAttentionAnimation(previous: HeadAttentionTrigger?, current: HeadAttentionTrigger?) {
+        guard previous != current else { return }
+        guard current != nil else {
+            stopAttentionAnimation()
+            return
+        }
+
+        // The attention jump should take over the motion language and end at rest.
+        stopWorkingAnimation()
+        startAttentionAnimation()
+    }
+
+    private func startAttentionAnimation() {
+        attentionTask?.cancel()
+        resetAttentionTransform()
+
+        attentionTask = Task { @MainActor in
+            // Defensive reset in case a repeat-forever bobble transaction is still active.
+            stopWorkingAnimation()
+
+            withAnimation(.spring(response: 0.20, dampingFraction: 0.78)) {
+                attentionJumpOffset = -7
+                attentionSquishX = 0.96
+                attentionSquishY = 1.04
+            }
+
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.spring(response: 0.16, dampingFraction: 0.60)) {
+                attentionJumpOffset = 2
+                attentionSquishX = 1.05
+                attentionSquishY = 0.95
+            }
+
+            try? await Task.sleep(for: .milliseconds(130))
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                attentionJumpOffset = 0
+                attentionSquishX = 1
+                attentionSquishY = 1
+            }
+
+            // Keep the head settled after the completion jump.
+            stopWorkingAnimation()
+        }
+    }
+
+    private func stopAttentionAnimation() {
+        attentionTask?.cancel()
+        attentionTask = nil
+        resetAttentionTransform()
+    }
+
+    private func resetAttentionTransform() {
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            attentionJumpOffset = 0
+            attentionSquishX = 1
+            attentionSquishY = 1
         }
     }
 }
@@ -488,4 +659,9 @@ private enum HeadStatus: Equatable {
             return .green
         }
     }
+}
+
+private enum HeadAttentionTrigger: Equatable {
+    case completed
+    case permission
 }
