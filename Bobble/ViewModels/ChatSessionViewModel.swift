@@ -29,6 +29,8 @@ class ChatSessionViewModel: ObservableObject {
     private var shouldRecycleCopilotTransportAfterTurn = false
     private var shouldResetTransportAfterTurn = false
     private var pendingTextReplyInterruptionID: String?
+    private var didPlayCompletionSoundForCurrentTurn = false
+    private var suppressCompletionSoundForCurrentTurn = false
 
     static func mergeAssistantContent(current: String, incoming: String) -> String? {
         guard !incoming.isEmpty else { return nil }
@@ -180,6 +182,9 @@ class ChatSessionViewModel: ObservableObject {
         if let replyInterruptionID = pendingTextReplyInterruptionID,
            let transport = conversationTransport {
             session.state = .running
+            didPlayCompletionSoundForCurrentTurn = false
+            suppressCompletionSoundForCurrentTurn = false
+            MonsterSoundPlayer.shared.play(.turnStarted)
             self.pendingTextReplyInterruptionID = nil
             transport.resolveInterruption(
                 id: replyInterruptionID,
@@ -202,6 +207,9 @@ class ChatSessionViewModel: ObservableObject {
         }
 
         session.state = .running
+        didPlayCompletionSoundForCurrentTurn = false
+        suppressCompletionSoundForCurrentTurn = false
+        MonsterSoundPlayer.shared.play(.turnStarted)
         notifyUpdate()
 
         let shouldResume = session.cliSessionBackend == backend
@@ -228,6 +236,7 @@ class ChatSessionViewModel: ObservableObject {
     }
 
     func terminate() {
+        suppressCompletionSoundForCurrentTurn = true
         resetConversationTransport()
     }
 
@@ -339,6 +348,7 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.appendInterruptionMessage(interruption)
+                self.suppressCompletionSoundForCurrentTurn = true
                 self.finishAssistantRun()
                 if interruption.responseMode == .textReply {
                     self.pendingTextReplyInterruptionID = interruption.id
@@ -351,6 +361,7 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.finishAssistantRun()
+                self.playCompletionSoundIfNeeded()
                 self.pendingTextReplyInterruptionID = nil
                 self.handleTurnLifecycleCompletion()
                 self.notifyUpdate()
@@ -379,6 +390,7 @@ class ChatSessionViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.finishAssistantRun()
+                self.playCompletionSoundIfNeeded()
                 self.pendingTextReplyInterruptionID = nil
                 self.notifyUpdate()
             }
@@ -395,6 +407,7 @@ class ChatSessionViewModel: ObservableObject {
                 self.session.state = .error(error)
                 self.session.cliSessionBackend = nil
                 self.pendingTextReplyInterruptionID = nil
+                self.suppressCompletionSoundForCurrentTurn = true
                 self.handleTurnLifecycleCompletion(forceReset: true)
                 self.notifyUpdate()
             }
@@ -722,6 +735,13 @@ class ChatSessionViewModel: ObservableObject {
         if case .running = session.state {
             session.state = .idle
         }
+    }
+
+    private func playCompletionSoundIfNeeded() {
+        guard !suppressCompletionSoundForCurrentTurn else { return }
+        guard !didPlayCompletionSoundForCurrentTurn else { return }
+        didPlayCompletionSoundForCurrentTurn = true
+        MonsterSoundPlayer.shared.play(.turnCompleted)
     }
 
     private func classifySystemEventKind(_ text: String) -> ChatMessage.Kind {

@@ -41,6 +41,9 @@
 		A10000034 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000034 /* StatusBarController.swift */; };
 		A10000035 /* PanelCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000035 /* PanelCoordinator.swift */; };
 		A10000036 /* ChatHeadsLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000036 /* ChatHeadsLayoutMode.swift */; };
+		A10000037 /* MonsterSoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000037 /* MonsterSoundPlayer.swift */; };
+		A10000038 /* monster-growl-start.wav in Resources */ = {isa = PBXBuildFile; fileRef = B10000038 /* monster-growl-start.wav */; };
+		A10000039 /* monster-growl-complete.wav in Resources */ = {isa = PBXBuildFile; fileRef = B10000039 /* monster-growl-complete.wav */; };
 		A20000001 /* AttachmentSummaryFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000001 /* AttachmentSummaryFormatterTests.swift */; };
 		A20000002 /* ProviderModelOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000002 /* ProviderModelOptionTests.swift */; };
 		A20000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20000003 /* XCTest.framework */; };
@@ -95,6 +98,9 @@
 		B10000034 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		B10000035 /* PanelCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCoordinator.swift; sourceTree = "<group>"; };
 		B10000036 /* ChatHeadsLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHeadsLayoutMode.swift; sourceTree = "<group>"; };
+		B10000037 /* MonsterSoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonsterSoundPlayer.swift; sourceTree = "<group>"; };
+		B10000038 /* monster-growl-start.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "monster-growl-start.wav"; sourceTree = "<group>"; };
+		B10000039 /* monster-growl-complete.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "monster-growl-complete.wav"; sourceTree = "<group>"; };
 		B10000099 /* Bobble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bobble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000001 /* AttachmentSummaryFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentSummaryFormatterTests.swift; sourceTree = "<group>"; };
 		B20000002 /* ProviderModelOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModelOptionTests.swift; sourceTree = "<group>"; };
@@ -228,6 +234,7 @@
 				B10000028 /* ChatHeadPreviewFormatter.swift */,
 				B10000033 /* UsageMonitor.swift */,
 				B10000034 /* StatusBarController.swift */,
+				B10000037 /* MonsterSoundPlayer.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -236,8 +243,18 @@
 			isa = PBXGroup;
 			children = (
 				B10000018 /* Assets.xcassets */,
+				D10000011 /* Sounds */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		D10000011 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				B10000038 /* monster-growl-start.wav */,
+				B10000039 /* monster-growl-complete.wav */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 		D10000010 /* BobbleTests */ = {
@@ -332,6 +349,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000018 /* Assets.xcassets in Resources */,
+				A10000038 /* monster-growl-start.wav in Resources */,
+				A10000039 /* monster-growl-complete.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,6 +394,7 @@
 				A10000034 /* StatusBarController.swift in Sources */,
 				A10000035 /* PanelCoordinator.swift in Sources */,
 				A10000036 /* ChatHeadsLayoutMode.swift in Sources */,
+				A10000037 /* MonsterSoundPlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
