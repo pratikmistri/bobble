@@ -80,4 +80,15 @@ final class WindowPositionManagerLayoutTests: XCTestCase {
         XCTAssertEqual(oversized.width, baseline.width, accuracy: 0.001)
         XCTAssertEqual(oversized.height, baseline.height, accuracy: 0.001)
     }
+
+    func testVerticalExpandedWidthIncludesInsetPadding() {
+        let size = positionManager.expandedPanelSize(
+            headsCount: 1,
+            expandedIndex: 0,
+            layoutMode: .vertical
+        )
+        let expectedWidth = 320 + (DesignTokens.headInset * 2) + DesignTokens.headPreviewOverflow
+
+        XCTAssertEqual(size.width, expectedWidth, accuracy: 0.001)
+    }
 }

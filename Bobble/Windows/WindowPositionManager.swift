@@ -20,7 +20,8 @@ struct WindowPositionManager {
         let maxDeckHeadsPerSide = DesignTokens.maxHorizontalExpandedDeckHeadsPerSide
         let leftDeck = deckStackLength(for: maxDeckHeadsPerSide)
         let rightDeck = deckStackLength(for: maxDeckHeadsPerSide)
-        let interColumnSpacing = DesignTokens.headSpacing * 4 // add + history + left deck + chat + right deck
+        let interColumnSpacing = DesignTokens.addHistoryControlSpacing + (DesignTokens.headSpacing * 3)
+        // add + history + left deck + chat + right deck
 
         return inset
             + controlWidth
@@ -55,7 +56,11 @@ struct WindowPositionManager {
         }
 
         let height = rows.reduce(0, +)
-            + CGFloat(max(rows.count - 1, 0)) * headSpacing
+            + spacedDistance(
+                itemCount: rows.count,
+                leadingGap: DesignTokens.addHistoryControlSpacing,
+                defaultGap: DesignTokens.verticalControlSpacing
+            )
             + inset
 
         let stackVisualOverflow = count > 0 ? headVisualPadding : 0
@@ -81,7 +86,11 @@ struct WindowPositionManager {
 
         let width = inset
             + columns.reduce(0, +)
-            + CGFloat(max(columns.count - 1, 0)) * headSpacing
+            + spacedDistance(
+                itemCount: columns.count,
+                leadingGap: DesignTokens.addHistoryControlSpacing,
+                defaultGap: headSpacing
+            )
             + DesignTokens.headPreviewOverflow
         let height = inset + controlWidth
 
@@ -129,10 +138,14 @@ struct WindowPositionManager {
         }
 
         let rowsHeight = rows.reduce(0, +)
-        let rowSpacing = CGFloat(max(rows.count - 1, 0)) * headSpacing
+        let rowSpacing = spacedDistance(
+            itemCount: rows.count,
+            leadingGap: DesignTokens.addHistoryControlSpacing,
+            defaultGap: DesignTokens.verticalControlSpacing
+        )
         let totalH = inset + rowsHeight + rowSpacing
         return NSSize(
-            width: chatWidth + DesignTokens.headPreviewOverflow,
+            width: inset + chatWidth + DesignTokens.headPreviewOverflow,
             height: totalH
         )
     }
@@ -167,7 +180,11 @@ struct WindowPositionManager {
 
         let width = inset
             + columns.reduce(0, +)
-            + CGFloat(max(columns.count - 1, 0)) * headSpacing
+            + spacedDistance(
+                itemCount: columns.count,
+                leadingGap: DesignTokens.addHistoryControlSpacing,
+                defaultGap: headSpacing
+            )
             + DesignTokens.headPreviewOverflow
         let height = inset + max(chatHeight, controlWidth)
 
@@ -202,6 +219,11 @@ struct WindowPositionManager {
         guard count > 0 else { return 0 }
         return DesignTokens.headControlDiameter * CGFloat(count)
             + CGFloat(count - 1) * headSpacing
+    }
+
+    private func spacedDistance(itemCount: Int, leadingGap: CGFloat, defaultGap: CGFloat) -> CGFloat {
+        guard itemCount > 1 else { return 0 }
+        return leadingGap + CGFloat(max(itemCount - 2, 0)) * defaultGap
     }
 
     // MARK: - Panel anchor and origin

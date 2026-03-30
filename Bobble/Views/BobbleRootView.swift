@@ -103,17 +103,46 @@ struct BobbleRootView: View {
     }
 
     private var headButtonFrameAlignment: Alignment {
-        isHorizontalLayout ? .center : (dockSide == .trailing ? .trailing : .leading)
+        if isHorizontalLayout {
+            return .center
+        }
+        return dockSide == .trailing ? .trailing : .leading
+    }
+
+    private var verticalControlsAlignment: HorizontalAlignment {
+        dockSide == .trailing ? .trailing : .leading
     }
 
     private var controlsLayout: AnyLayout {
         if isHorizontalLayout {
-            return AnyLayout(HStackLayout(alignment: .bottom, spacing: DesignTokens.headSpacing))
+            return AnyLayout(
+                HStackLayout(
+                    alignment: isExpanded ? .bottom : .center,
+                    spacing: DesignTokens.headSpacing
+                )
+            )
         }
         return AnyLayout(
             VStackLayout(
-                alignment: dockSide == .trailing ? .trailing : .leading,
-                spacing: DesignTokens.headSpacing
+                alignment: verticalControlsAlignment,
+                spacing: DesignTokens.verticalControlSpacing
+            )
+        )
+    }
+
+    private var primaryControlsLayout: AnyLayout {
+        if isHorizontalLayout {
+            return AnyLayout(
+                HStackLayout(
+                    alignment: isExpanded ? .bottom : .center,
+                    spacing: DesignTokens.addHistoryControlSpacing
+                )
+            )
+        }
+        return AnyLayout(
+            VStackLayout(
+                alignment: verticalControlsAlignment,
+                spacing: DesignTokens.addHistoryControlSpacing
             )
         )
     }
@@ -163,23 +192,25 @@ struct BobbleRootView: View {
                         .allowsHitTesting(false)
                 }
 
-                controlsLayout {
+                primaryControlsLayout {
                     addButton
                         .contentShape(Rectangle())
                         .simultaneousGesture(headsDragGesture)
 
-                    if let session = expandedSession,
-                       let sessionId = manager.expandedSessionId,
-                       let viewModel = manager.viewModel(for: sessionId) {
-                        expandedContent(
-                            session: session,
-                            sessionId: sessionId,
-                            viewModel: viewModel
-                        )
-                    } else {
-                        collapsedContent
-                            .contentShape(Rectangle())
-                            .simultaneousGesture(headsDragGesture)
+                    controlsLayout {
+                        if let session = expandedSession,
+                           let sessionId = manager.expandedSessionId,
+                           let viewModel = manager.viewModel(for: sessionId) {
+                            expandedContent(
+                                session: session,
+                                sessionId: sessionId,
+                                viewModel: viewModel
+                            )
+                        } else {
+                            collapsedContent
+                                .contentShape(Rectangle())
+                                .simultaneousGesture(headsDragGesture)
+                        }
                     }
                 }
                 .padding(DesignTokens.headInset)
@@ -322,6 +353,7 @@ struct BobbleRootView: View {
             },
             morphNamespace: morphNamespace
         )
+        .padding(.horizontal, actionButtonShadowPadding)
         .frame(width: controlItemWidth, alignment: headButtonFrameAlignment)
     }
 

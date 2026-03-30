@@ -10,6 +10,8 @@ enum DesignTokens {
     static let headSpacing: CGFloat = 8
     static let headInset: CGFloat = 14 // extra space around heads for hover scale, shadows, indicators
     static let headVisualPadding: CGFloat = 8 // extra per-head render room for blur/shadow
+    static let addHistoryControlSpacing: CGFloat = headSpacing + 12
+    static let verticalControlSpacing: CGFloat = headSpacing + (headVisualPadding / 2)
     static let headPreviewWidth: CGFloat = 220
     static let headPreviewGap: CGFloat = 14
     static let headPreviewOverflow: CGFloat = 250
