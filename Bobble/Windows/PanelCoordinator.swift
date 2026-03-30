@@ -272,12 +272,6 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
     func finishMovingPanel() {
         lastDragMouseLocation = nil
         lastDragSample = nil
-        panelAnchor = positionManager.panelAnchor(
-            for: mainPanel.frame.origin,
-            size: mainPanel.frame.size,
-            dockSide: dockSide
-        )
-        preferredPanelAnchor = panelAnchor
         startPhysicsIfNeeded()
     }
 
@@ -342,7 +336,7 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         tossVelocity = clampedVelocity(tossVelocity)
 
         guard hypot(tossVelocity.dx, tossVelocity.dy) > 90 else {
-            tossVelocity = .zero
+            settlePanelAfterMovement()
             return
         }
 
@@ -393,8 +387,34 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         tossVelocity = velocity
 
         if hypot(velocity.dx, velocity.dy) < 18 {
-            stopPhysics()
+            settlePanelAfterMovement()
         }
+    }
+
+    private func settlePanelAfterMovement() {
+        stopPhysics()
+        tossVelocity = .zero
+
+        let currentFrame = mainPanel.frame
+        let resolvedDockSide = positionManager.preferredDockSide(
+            for: currentFrame.origin,
+            size: currentFrame.size,
+            currentSide: dockSide
+        )
+        let resolvedOrigin = positionManager.constrainedPanelOrigin(
+            currentFrame.origin,
+            for: currentFrame.size,
+            dockSide: resolvedDockSide
+        )
+
+        dockSide = resolvedDockSide
+        mainPanel.setFrameOrigin(resolvedOrigin)
+        panelAnchor = positionManager.panelAnchor(
+            for: resolvedOrigin,
+            size: currentFrame.size,
+            dockSide: resolvedDockSide
+        )
+        preferredPanelAnchor = panelAnchor
     }
 
     private func clampedVelocity(_ velocity: CGVector) -> CGVector {
