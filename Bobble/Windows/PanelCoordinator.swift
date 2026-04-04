@@ -80,7 +80,7 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         panelAnchor = finalState.anchor
         dockSide = finalState.dockSide
         performPanelLayoutMutation {
-            self.mainPanel.setFrame(finalState.frame, display: false)
+            self.setPanelFrameIfNeeded(finalState.frame, display: false)
 
             DispatchQueue.main.async {
                 if animateStateChange {
@@ -130,7 +130,7 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
         panelAnchor = finalState.anchor
         dockSide = finalState.dockSide
         performPanelLayoutMutation {
-            self.mainPanel.setFrame(finalState.frame, display: false)
+            self.setPanelFrameIfNeeded(finalState.frame, display: false)
             DispatchQueue.main.async {
                 if animateStateChange {
                     withAnimation(DesignTokens.motionLayout) {
@@ -194,13 +194,13 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
                 context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
                 self.mainPanel.animator().setFrame(
                     animatedFrame,
-                    display: true
+                    display: false
                 )
             } completionHandler: {
                 self.panelAnchor = finalAnchor
                 self.dockSide = finalDockSide
                 self.performPanelLayoutMutation {
-                    self.mainPanel.setFrame(finalFrame, display: true)
+                    self.setPanelFrameIfNeeded(finalFrame, display: false)
                     completion?()
                 }
             }
@@ -220,7 +220,7 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
             dockSide: dockSide
         )
         performPanelLayoutMutation {
-            self.mainPanel.setFrame(NSRect(origin: finalOrigin, size: finalSize), display: true)
+            self.setPanelFrameIfNeeded(NSRect(origin: finalOrigin, size: finalSize), display: false)
         }
     }
 
@@ -292,6 +292,18 @@ final class PanelCoordinator: NSObject, NSWindowDelegate {
 
     private func performPanelLayoutMutation(_ mutation: @escaping () -> Void) {
         DispatchQueue.main.async(execute: mutation)
+    }
+
+    private func setPanelFrameIfNeeded(_ frame: NSRect, display: Bool) {
+        guard !isApproximatelyEqual(mainPanel.frame, frame) else { return }
+        mainPanel.setFrame(frame, display: display)
+    }
+
+    private func isApproximatelyEqual(_ lhs: NSRect, _ rhs: NSRect, tolerance: CGFloat = 0.5) -> Bool {
+        abs(lhs.origin.x - rhs.origin.x) <= tolerance
+            && abs(lhs.origin.y - rhs.origin.y) <= tolerance
+            && abs(lhs.size.width - rhs.size.width) <= tolerance
+            && abs(lhs.size.height - rhs.size.height) <= tolerance
     }
 
     private func resolvedPanelState(

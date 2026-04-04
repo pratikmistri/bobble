@@ -148,23 +148,44 @@ struct InputBarView: View {
 
     private func startDictation() {
         isInputFocused = true
-        DispatchQueue.main.async {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             NSApp.activate(ignoringOtherApps: true)
+            triggerDictationAction()
+        }
+    }
 
-            let selector = Selector(("startDictation:"))
-            let keyWindow = NSApp.keyWindow ?? NSApp.windows.first(where: \.isKeyWindow)
+    private func triggerDictationAction() {
+        let selector = Selector(("startDictation:"))
+        let keyWindow = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: \.isKeyWindow)
 
-            if let responder = keyWindow?.firstResponder, responder.responds(to: selector) {
-                NSApp.sendAction(selector, to: responder, from: nil)
-                return
+        if let responder = keyWindow?.firstResponder, responder.responds(to: selector) {
+            _ = NSApp.sendAction(selector, to: responder, from: nil)
+            return
+        }
+
+        if let fieldEditor = keyWindow?.fieldEditor(false, for: nil), fieldEditor.responds(to: selector) {
+            _ = NSApp.sendAction(selector, to: fieldEditor, from: nil)
+            return
+        }
+
+        _ = NSApp.sendAction(selector, to: nil, from: nil)
+    }
+
+    private func handleOpenPanelResponse(_ response: NSApplication.ModalResponse, panel: NSOpenPanel) {
+        guard response == .OK else { return }
+        viewModel.attachFiles(urls: panel.urls)
+    }
+
+    private func presentOpenPanel(_ panel: NSOpenPanel) {
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            panel.beginSheetModal(for: window) { response in
+                handleOpenPanelResponse(response, panel: panel)
             }
+            return
+        }
 
-            if let fieldEditor = keyWindow?.fieldEditor(false, for: nil), fieldEditor.responds(to: selector) {
-                NSApp.sendAction(selector, to: fieldEditor, from: nil)
-                return
-            }
-
-            NSApp.sendAction(selector, to: nil, from: nil)
+        panel.begin { response in
+            handleOpenPanelResponse(response, panel: panel)
         }
     }
 
@@ -175,8 +196,8 @@ struct InputBarView: View {
         panel.allowsMultipleSelection = true
         panel.resolvesAliases = true
 
-        guard panel.runModal() == .OK else { return }
-        viewModel.attachFiles(urls: panel.urls)
+        NSApp.activate(ignoringOtherApps: true)
+        presentOpenPanel(panel)
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
