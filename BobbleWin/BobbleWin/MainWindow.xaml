@@ -1,0 +1,238 @@
+<Window
+    x:Class="BobbleWin.MainWindow"
+    x:Name="RootWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:BobbleWin.Models"
+    xmlns:views="using:BobbleWin.Views"
+    mc:Ignorable="d"
+    Title="BobbleWin"
+    Width="1120"
+    Height="760">
+
+    <Window.Resources>
+        <views:ProviderDisplayConverter x:Key="ProviderDisplayConverter" />
+        <views:LayoutTitleConverter x:Key="LayoutTitleConverter" />
+        <views:MessageRoleToAlignmentConverter x:Key="MessageRoleToAlignmentConverter" />
+        <views:MessageRoleToBubbleBrushConverter x:Key="MessageRoleToBubbleBrushConverter" />
+        <views:NullToCollapsedConverter x:Key="NullToCollapsedConverter" />
+        <views:NullToVisibleConverter x:Key="NullToVisibleConverter" />
+        <views:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
+    <Grid Background="#25221F">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="16" BorderBrush="#544A41" BorderThickness="0,0,0,1">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" Content="+ New Chat" Command="{Binding AddSessionCommand}" MinWidth="110" />
+
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding AvailableProviders}"
+                          SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
+                          DisplayMemberPath=".">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource ProviderDisplayConverter}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <ComboBox Grid.Column="2"
+                          ItemsSource="{Binding LayoutModes}"
+                          SelectedItem="{Binding SelectedLayoutMode, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource LayoutTitleConverter}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <TextBlock Grid.Column="3"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Foreground="#D0BFB2"
+                           Text="BobbleWin - Floating desktop companion for Codex, Copilot, and Claude" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Padding="14" ColumnSpacing="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="#2E2A26" CornerRadius="14" BorderBrush="#544A41" BorderThickness="1" Padding="10">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Active Chats" Foreground="#F3E9DF" FontWeight="SemiBold" FontSize="14" />
+
+                    <ListView Grid.Row="1"
+                              ItemsSource="{Binding Sessions}"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding SelectedSessionId, Mode=TwoWay}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:ChatSession">
+                                <Grid ColumnSpacing="10" Padding="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Width="34" Height="34" CornerRadius="17" Background="#6E5A4B" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ChatHeadImageName}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#FFF3E9DF" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{Binding Name}" Foreground="#F3E9DF" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Provider, Converter={StaticResource ProviderDisplayConverter}}" Foreground="#D0BFB2" FontSize="11" />
+                                    </StackPanel>
+
+                                    <Ellipse Grid.Column="2" Width="8" Height="8" Fill="#E3B56E" Visibility="{Binding HasUnread, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <Expander Grid.Row="2" Header="History" IsExpanded="False">
+                        <ItemsControl ItemsSource="{Binding HistorySessions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:ChatSession">
+                                    <Grid Margin="0,4,0,4" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#F3E9DF" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Open" Command="{Binding DataContext.RestoreHistorySessionCommand, ElementName=RootWindow}" CommandParameter="{Binding}" Margin="0,0,4,0" />
+                                        <Button Grid.Column="2" Content="Delete" Command="{Binding DataContext.DeleteHistorySessionCommand, ElementName=RootWindow}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <Border Background="#2E2A26" CornerRadius="14" BorderBrush="#544A41" BorderThickness="1" Padding="10" Visibility="{Binding SelectedSessionViewModel, Converter={StaticResource NullToVisibleConverter}}">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                        <TextBlock Text="Select a chat head to open a conversation" Foreground="#D0BFB2" FontSize="18" />
+                        <TextBlock Text="Use + New Chat to spawn another session" Foreground="#B9AA9F" />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#2E2A26" CornerRadius="14" BorderBrush="#544A41" BorderThickness="1" Padding="10" Visibility="{Binding SelectedSessionViewModel, Converter={StaticResource NullToCollapsedConverter}}">
+                    <Grid RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Vertical">
+                                <TextBlock Text="{Binding SelectedSessionViewModel.Session.Name}" Foreground="#F3E9DF" FontWeight="SemiBold" FontSize="15" />
+                                <TextBlock Text="{Binding SelectedSessionViewModel.Session.Provider, Converter={StaticResource ProviderDisplayConverter}}" Foreground="#D0BFB2" FontSize="11" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Content="Archive" Command="{Binding ArchiveSessionCommand}" CommandParameter="{Binding SelectedSessionViewModel.Session}" />
+                            <Button Grid.Column="2" Content="Close" Command="{Binding CloseSessionCommand}" />
+                        </Grid>
+
+                        <ListView Grid.Row="1" ItemsSource="{Binding SelectedSessionViewModel.VisibleMessages}" Background="Transparent" BorderThickness="0">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:ChatMessage">
+                                    <Grid Margin="0,6,0,6">
+                                        <Border Background="{Binding Role, Converter={StaticResource MessageRoleToBubbleBrushConverter}}"
+                                                BorderBrush="#6A5E54"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                Padding="10"
+                                                HorizontalAlignment="{Binding Role, Converter={StaticResource MessageRoleToAlignmentConverter}}"
+                                                MaxWidth="560">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Content}" TextWrapping="Wrap" Foreground="#FFF3E9DF" />
+
+                                                <ItemsControl ItemsSource="{Binding Attachments}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:ChatAttachment">
+                                                            <TextBlock Text="{Binding RelativePath}" Margin="0,6,0,0" Foreground="#D0BFB2" FontSize="11" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <StackPanel Grid.Row="2" Spacing="8">
+                            <ItemsControl ItemsSource="{Binding SelectedSessionViewModel.PendingAttachments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ChatAttachment">
+                                        <Border Background="#3A342F" Padding="8,4" CornerRadius="10">
+                                            <TextBlock Text="{Binding FileName}" Foreground="#F3E9DF" FontSize="11" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding SelectedSessionViewModel.InputText, Mode=TwoWay}"
+                                         PlaceholderText="Ask anything..."
+                                         AcceptsReturn="True"
+                                         MinHeight="44"
+                                         MaxHeight="120"
+                                         TextWrapping="Wrap" />
+
+                                <Button Grid.Column="1" Content="Attach" Click="AttachButton_Click" />
+                                <Button Grid.Column="2" Content="Screenshot" Command="{Binding CaptureScreenshotCommand}" />
+                                <Button Grid.Column="3" Content="Send" Command="{Binding SendCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
