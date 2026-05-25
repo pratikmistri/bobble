@@ -536,13 +536,6 @@ public partial class MainWindow : Window
         _dragStartScreenPoint = null;
     }
 
-    private void LayoutToggle_Click(object sender, RoutedEventArgs e)
-    {
-        _viewModel.SelectedLayoutMode = _viewModel.SelectedLayoutMode == BobbleWin.Models.ChatHeadsLayoutMode.Vertical
-            ? BobbleWin.Models.ChatHeadsLayoutMode.Horizontal
-            : BobbleWin.Models.ChatHeadsLayoutMode.Vertical;
-    }
-
     private void HeadColumn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // Legacy handler — drag is now serviced at the window level. Keep for compatibility.

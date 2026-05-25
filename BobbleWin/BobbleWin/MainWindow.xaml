@@ -417,13 +417,6 @@
                         Content="&#xE81C;"
                         Click="HistoryButton_Click" />
 
-                <Button Style="{StaticResource CircleControlButton}"
-                        Margin="0,0,8,8"
-                        ToolTip="Toggle layout (vertical/horizontal)"
-                        FontFamily="{StaticResource FluentIcons}"
-                        Content="{Binding SelectedLayoutMode, Converter={StaticResource LayoutModeToToggleIconConverter}}"
-                        Click="LayoutToggle_Click" />
-
                 <ItemsControl ItemsSource="{Binding Sessions}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
