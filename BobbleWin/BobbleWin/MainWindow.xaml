@@ -11,7 +11,10 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         SizeToContent="WidthAndHeight"
-        WindowStartupLocation="Manual">
+        WindowStartupLocation="Manual"
+        PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
+        PreviewMouseMove="Window_PreviewMouseMove"
+        PreviewMouseLeftButtonUp="Window_PreviewMouseLeftButtonUp">
 
     <Window.Resources>
         <views:ProviderDisplayConverter x:Key="ProviderDisplayConverter" />
@@ -21,8 +24,87 @@
         <views:NullToVisibleConverter x:Key="NullToVisibleConverter" />
         <views:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <views:ChatHeadAvatarConverter x:Key="ChatHeadAvatarConverter" />
+        <views:LayoutModeToOuterOrientationConverter x:Key="LayoutModeToOuterOrientationConverter" />
+        <views:LayoutModeToInnerOrientationConverter x:Key="LayoutModeToInnerOrientationConverter" />
+        <views:LayoutModeChatMarginConverter x:Key="LayoutModeChatMarginConverter" />
+        <views:LayoutModeToToggleIconConverter x:Key="LayoutModeToToggleIconConverter" />
+        <views:SessionStatusToBrushConverter x:Key="SessionStatusToBrushConverter" />
+        <views:SessionToStatusVisibilityConverter x:Key="SessionToStatusVisibilityConverter" />
+        <views:BackendBadgeTextConverter x:Key="BackendBadgeTextConverter" />
+        <views:BackendBadgeBackgroundConverter x:Key="BackendBadgeBackgroundConverter" />
+        <views:BackendBadgeForegroundConverter x:Key="BackendBadgeForegroundConverter" />
+        <views:MessageRoleToMarkdownVisibilityConverter x:Key="MessageRoleToMarkdownVisibilityConverter" />
+        <views:MessageRoleToPlainVisibilityConverter x:Key="MessageRoleToPlainVisibilityConverter" />
+        <views:SessionStateKindIsRunningConverter x:Key="SessionStateKindIsRunningConverter" />
 
         <FontFamily x:Key="FluentIcons">Segoe Fluent Icons</FontFamily>
+
+        <!-- Continuous bobble storyboard used while a session is working (Running). -->
+        <Storyboard x:Key="WorkingBobble" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.32" Value="1.04" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.64" Value="1.0" />
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="1.0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.32" Value="0.96" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.64" Value="1.0" />
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.32" Value="-6" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.64" Value="0" />
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[2].(RotateTransform.Angle)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.16" Value="2" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.48" Value="-2" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.64" Value="0" />
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <!-- One-shot completion bounce triggered when a session transitions Running → Idle.
+             Repeats 5 cycles so the user can spot the completion even out of the corner of an eye. -->
+        <Storyboard x:Key="CompletedJump" RepeatBehavior="5x">
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="-12">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <CubicEase EasingMode="EaseOut" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="4">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <CubicEase EasingMode="EaseIn" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.62" Value="0">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <CubicEase EasingMode="EaseOut" />
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="0.96" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="1.05" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.62" Value="1" />
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="1.04" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="0.95" />
+                <EasingDoubleKeyFrame KeyTime="0:0:0.62" Value="1" />
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
 
         <Style TargetType="Thumb" x:Key="ShyScrollThumb">
             <Setter Property="Background" Value="#80F3E9DF" />
@@ -32,8 +114,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Border CornerRadius="2"
-                                Background="{TemplateBinding Background}" />
+                        <Border CornerRadius="2" Background="{TemplateBinding Background}" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -70,12 +151,10 @@
                                     <Thumb Style="{StaticResource ShyScrollThumb}" />
                                 </Track.Thumb>
                                 <Track.IncreaseRepeatButton>
-                                    <RepeatButton Style="{StaticResource ShyScrollRepeat}"
-                                                  Command="ScrollBar.PageDownCommand" />
+                                    <RepeatButton Style="{StaticResource ShyScrollRepeat}" Command="ScrollBar.PageDownCommand" />
                                 </Track.IncreaseRepeatButton>
                                 <Track.DecreaseRepeatButton>
-                                    <RepeatButton Style="{StaticResource ShyScrollRepeat}"
-                                                  Command="ScrollBar.PageUpCommand" />
+                                    <RepeatButton Style="{StaticResource ShyScrollRepeat}" Command="ScrollBar.PageUpCommand" />
                                 </Track.DecreaseRepeatButton>
                             </Track>
                         </Grid>
@@ -111,6 +190,7 @@
             </Setter>
         </Style>
 
+        <!-- Animated chat-head button. -->
         <Style x:Key="HeadButton" TargetType="Button">
             <Setter Property="Width" Value="56" />
             <Setter Property="Height" Value="56" />
@@ -118,6 +198,7 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -127,6 +208,17 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="1" ScaleY="1" />
+                        <TranslateTransform X="0" Y="0" />
+                        <RotateTransform Angle="0" />
+                    </TransformGroup>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="ToolButton" TargetType="Button">
@@ -155,14 +247,24 @@
     </Window.Resources>
 
     <Grid x:Name="RootGrid" Background="Transparent">
-        <StackPanel Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top">
+        <Grid x:Name="OuterLayout"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
             <!-- Expanded chat panel (visible when a session is selected) -->
-            <Border Width="340"
+            <Border x:Name="ChatPanel"
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Width="340"
                     Height="500"
-                    Margin="0,0,14,0"
                     Background="#F22E2A26"
                     BorderBrush="#66544A41"
                     BorderThickness="1"
@@ -242,9 +344,18 @@
                                         Padding="10"
                                         HorizontalAlignment="{Binding Role, Converter={StaticResource MessageRoleToAlignmentConverter}}"
                                         MaxWidth="280">
-                                    <TextBlock Text="{Binding Content}"
-                                               TextWrapping="Wrap"
-                                               Foreground="#FFF3E9DF" />
+                                    <Grid>
+                                        <!-- Plain text for user / system / error messages. -->
+                                        <TextBlock Text="{Binding Content}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="#FFF3E9DF"
+                                                   Visibility="{Binding Role, Converter={StaticResource MessageRoleToPlainVisibilityConverter}}" />
+
+                                        <!-- Markdown rendering for assistant messages (handles streaming). -->
+                                        <views:MarkdownTextBlock Markdown="{Binding Content}"
+                                                                  ForegroundBrush="#FFF3E9DF"
+                                                                  Visibility="{Binding Role, Converter={StaticResource MessageRoleToMarkdownVisibilityConverter}}" />
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ListView.ItemTemplate>
@@ -285,60 +396,76 @@
                 </Grid>
             </Border>
 
-            <!-- Vertical column of floating control circles + chat heads -->
+            <!-- Stack of floating control circles + chat heads.
+                 Orientation flips Vertical/Horizontal based on the user-selected layout mode. -->
             <StackPanel x:Name="HeadColumn"
-                        Orientation="Vertical"
-                        VerticalAlignment="Top"
-                        Background="Transparent"
-                        MouseLeftButtonDown="HeadColumn_MouseLeftButtonDown">
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Orientation="{Binding SelectedLayoutMode, Converter={StaticResource LayoutModeToInnerOrientationConverter}}"
+                        Background="Transparent">
 
                 <Button Style="{StaticResource CircleControlButton}"
-                        Margin="0,0,0,8"
+                        Margin="0,0,8,8"
                         ToolTip="New chat"
                         Content="&#xE710;"
                         FontSize="20"
                         Command="{Binding AddSessionCommand}" />
 
                 <Button Style="{StaticResource CircleControlButton}"
-                        Margin="0,0,0,8"
+                        Margin="0,0,8,8"
                         ToolTip="History"
                         Content="&#xE81C;"
                         Click="HistoryButton_Click" />
 
+                <Button Style="{StaticResource CircleControlButton}"
+                        Margin="0,0,8,8"
+                        ToolTip="Toggle layout (vertical/horizontal)"
+                        FontFamily="{StaticResource FluentIcons}"
+                        Content="{Binding SelectedLayoutMode, Converter={StaticResource LayoutModeToToggleIconConverter}}"
+                        Click="LayoutToggle_Click" />
+
                 <ItemsControl ItemsSource="{Binding Sessions}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Vertical" />
+                            <StackPanel Orientation="{Binding DataContext.SelectedLayoutMode, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource LayoutModeToInnerOrientationConverter}}" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:ChatSession}">
-                            <Button Style="{StaticResource HeadButton}"
-                                    Margin="0,0,0,8"
-                                    Click="ChatHead_Click"
-                                    Tag="{Binding Id}">
-                                <Grid>
-                                    <Ellipse Width="56" Height="56">
-                                        <Ellipse.Fill>
-                                            <ImageBrush ImageSource="{Binding ChatHeadImageName, Converter={StaticResource ChatHeadAvatarConverter}}"
-                                                        Stretch="UniformToFill" />
-                                        </Ellipse.Fill>
-                                    </Ellipse>
-                                    <Ellipse Width="14"
-                                            Height="14"
-                                            Fill="#E3B56E"
-                                            Stroke="#25221F"
-                                            StrokeThickness="2"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Top"
-                                            Visibility="{Binding HasUnread, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                </Grid>
-                            </Button>
+                            <Grid Margin="0,0,8,8" Width="64" Height="64">
+                                <Button Style="{StaticResource HeadButton}"
+                                        Click="ChatHead_Click"
+                                        Tag="{Binding Id}"
+                                        ToolTip="{Binding Name}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        views:BobbleAnimations.IsWorking="{Binding State.Kind, Converter={StaticResource SessionStateKindIsRunningConverter}}">
+                                    <Grid>
+                                        <Ellipse Width="56" Height="56">
+                                            <Ellipse.Fill>
+                                                <ImageBrush ImageSource="{Binding ChatHeadImageName, Converter={StaticResource ChatHeadAvatarConverter}}"
+                                                            Stretch="UniformToFill" />
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                    </Grid>
+                                </Button>
+
+                                <!-- Status indicator dot (top-right). -->
+                                <Ellipse Width="14"
+                                         Height="14"
+                                         Fill="{Binding State, Converter={StaticResource SessionStatusToBrushConverter}}"
+                                         Stroke="#25221F"
+                                         StrokeThickness="2"
+                                         HorizontalAlignment="Right"
+                                         VerticalAlignment="Top"
+                                         Margin="0,2,2,0"
+                                         Visibility="{Binding ., Converter={StaticResource SessionToStatusVisibilityConverter}}" />
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
-        </StackPanel>
+        </Grid>
 
         <!-- History flyout panel -->
         <Border x:Name="HistoryPopup"

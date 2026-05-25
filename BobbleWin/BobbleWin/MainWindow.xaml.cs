@@ -11,8 +11,17 @@ namespace BobbleWin;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
-    private double _anchorRight = double.NaN;
-    private double _anchorTop = double.NaN;
+
+    // We anchor the *HeadColumn's* top-left corner to a screen-space point,
+    // so the heads stay put regardless of whether the chat panel is open and
+    // regardless of which screen edge they're docked against.
+    private double _anchorScreenX = double.NaN;
+    private double _anchorScreenY = double.NaN;
+
+    private enum HDock { Left, Right }
+    private enum VDock { Top, Bottom }
+    private HDock _hDock = HDock.Right;
+    private VDock _vDock = VDock.Top;
 
     public MainWindow(ChatHeadsManager manager)
     {
@@ -24,6 +33,17 @@ public partial class MainWindow : Window
         SourceInitialized += OnSourceInitialized;
         SizeChanged += OnSizeChanged;
         MessagesListView.Loaded += MessagesListView_Loaded;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.SelectedLayoutMode))
+        {
+            // Layout mode changed: re-place chat panel for the active dock corner.
+            ApplyDockLayout();
+            Dispatcher.BeginInvoke(new Action(ApplyAnchor), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
 
     private System.Windows.Controls.ScrollViewer? _messagesScrollViewer;
@@ -193,10 +213,17 @@ public partial class MainWindow : Window
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         var wa = SystemParameters.WorkArea;
+        // Start docked top-right with a 16px inset; anchor = HeadColumn's TOP-RIGHT corner.
+        _hDock = HDock.Right;
+        _vDock = VDock.Top;
+        ApplyDockLayout();
         UpdateLayout();
-        _anchorRight = wa.Right - 16;
-        _anchorTop = wa.Top + 80;
+        _anchorScreenX = wa.Right - 16;
+        _anchorScreenY = wa.Top + 80;
         ApplyAnchor();
+
+        // Re-clamp + re-place when the head column grows/shrinks (e.g., as sessions are added).
+        HeadColumn.SizeChanged += (_, __) => ApplyAnchor();
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -204,25 +231,321 @@ public partial class MainWindow : Window
         ApplyAnchor();
     }
 
+    private System.Windows.Point GetHeadColumnOffsetInWindow()
+    {
+        if (HeadColumn is null || !HeadColumn.IsLoaded) return new System.Windows.Point(0, 0);
+        try
+        {
+            return HeadColumn.TranslatePoint(new System.Windows.Point(0, 0), this);
+        }
+        catch
+        {
+            return new System.Windows.Point(0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Returns the offset (window-relative) of the HeadColumn corner that faces the
+    /// active dock edges (e.g. bottom-right corner if heads are docked bottom-right).
+    /// </summary>
+    private System.Windows.Point GetHeadAnchorCornerInWindow()
+    {
+        if (HeadColumn is null || !HeadColumn.IsLoaded) return new System.Windows.Point(0, 0);
+        var topLeft = HeadColumn.TranslatePoint(new System.Windows.Point(0, 0), this);
+        var cornerX = topLeft.X + (_hDock == HDock.Right ? HeadColumn.ActualWidth : 0);
+        var cornerY = topLeft.Y + (_vDock == VDock.Bottom ? HeadColumn.ActualHeight : 0);
+        return new System.Windows.Point(cornerX, cornerY);
+    }
+
     private void ApplyAnchor()
     {
-        if (double.IsNaN(_anchorRight)) return;
-        Left = _anchorRight - ActualWidth;
-        Top = _anchorTop;
+        if (double.IsNaN(_anchorScreenX) || HeadColumn is null) return;
+        ClampAnchorToWorkArea();
+        // Place the window so that the HeadColumn's dock-edge corner lands at
+        // (_anchorScreenX, _anchorScreenY). As more heads are added, the column
+        // grows AWAY from the docked edge instead of off-screen.
+        var corner = GetHeadAnchorCornerInWindow();
+        Left = _anchorScreenX - corner.X;
+        Top = _anchorScreenY - corner.Y;
+    }
+
+    private void UpdateAnchorFromCurrentPosition()
+    {
+        if (HeadColumn is null) return;
+        var corner = GetHeadAnchorCornerInWindow();
+        _anchorScreenX = Left + corner.X;
+        _anchorScreenY = Top + corner.Y;
+        ClampAnchorToWorkArea();
+    }
+
+    /// <summary>
+    /// Clamps the saved anchor so the HeadColumn (anchored at its dock-edge corner)
+    /// stays fully within the work area of whichever monitor currently contains the head.
+    /// </summary>
+    private void ClampAnchorToWorkArea()
+    {
+        if (HeadColumn is null) return;
+        var headWidth = HeadColumn.ActualWidth;
+        var headHeight = HeadColumn.ActualHeight;
+        if (headWidth <= 0 || headHeight <= 0) return;
+
+        // Convert anchor (dock-edge corner) to a center for screen-lookup.
+        var centerX = _anchorScreenX + (_hDock == HDock.Right ? -headWidth / 2 : headWidth / 2);
+        var centerY = _anchorScreenY + (_vDock == VDock.Bottom ? -headHeight / 2 : headHeight / 2);
+        var wa = GetWorkAreaForPoint(centerX, centerY);
+
+        const double inset = 4.0;
+        double minX, maxX, minY, maxY;
+        if (_hDock == HDock.Right)
+        {
+            // Anchor is the RIGHT edge of HeadColumn.
+            minX = wa.Left + headWidth + inset;
+            maxX = wa.Right - inset;
+        }
+        else
+        {
+            // Anchor is the LEFT edge.
+            minX = wa.Left + inset;
+            maxX = wa.Right - headWidth - inset;
+        }
+        if (_vDock == VDock.Bottom)
+        {
+            minY = wa.Top + headHeight + inset;
+            maxY = wa.Bottom - inset;
+        }
+        else
+        {
+            minY = wa.Top + inset;
+            maxY = wa.Bottom - headHeight - inset;
+        }
+        if (maxX < minX) maxX = minX;
+        if (maxY < minY) maxY = minY;
+
+        _anchorScreenX = Math.Clamp(_anchorScreenX, minX, maxX);
+        _anchorScreenY = Math.Clamp(_anchorScreenY, minY, maxY);
+    }
+
+    /// <summary>
+    /// Picks horizontal/vertical dock side based on the HeadColumn's screen-space
+    /// center vs the active screen's work-area midpoint, then re-places the chat
+    /// panel and head column inside the OuterLayout grid so the chat panel always
+    /// opens *away* from the nearest edge.
+    /// </summary>
+    private void RecomputeDockSidesFromScreenPosition()
+    {
+        if (HeadColumn is null || !HeadColumn.IsLoaded) return;
+        var offset = GetHeadColumnOffsetInWindow();
+        var headLeft = Left + offset.X;
+        var headTop = Top + offset.Y;
+        var headWidth = HeadColumn.ActualWidth;
+        var headHeight = HeadColumn.ActualHeight;
+        var headCenterX = headLeft + headWidth / 2;
+        var headCenterY = headTop + headHeight / 2;
+
+        var wa = GetWorkAreaForPoint(headCenterX, headCenterY);
+        var midX = (wa.Left + wa.Right) / 2.0;
+        var midY = (wa.Top + wa.Bottom) / 2.0;
+
+        var newH = headCenterX <= midX ? HDock.Left : HDock.Right;
+        var newV = headCenterY <= midY ? VDock.Top : VDock.Bottom;
+
+        if (newH != _hDock || newV != _vDock)
+        {
+            _hDock = newH;
+            _vDock = newV;
+            ApplyDockLayout();
+            // Anchor corner just changed — re-derive the screen-space anchor from the
+            // head column's current screen position (which already reflects the drag).
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UpdateAnchorFromCurrentPosition();
+                ApplyAnchor();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+    }
+
+    private System.Windows.Rect GetWorkAreaForPoint(double x, double y)
+    {
+        try
+        {
+            var (sx, sy) = DipToPixels(x, y);
+            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)sx, (int)sy));
+            var wa = screen.WorkingArea;
+            // Convert work-area pixels back to WPF DIPs.
+            var tl = PixelsToDip(wa.Left, wa.Top);
+            var br = PixelsToDip(wa.Right, wa.Bottom);
+            return new System.Windows.Rect(tl.X, tl.Y, br.X - tl.X, br.Y - tl.Y);
+        }
+        catch
+        {
+            return SystemParameters.WorkArea;
+        }
+    }
+
+    private (double X, double Y) DpiScale()
+    {
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget != null)
+        {
+            var m = source.CompositionTarget.TransformToDevice;
+            return (m.M11 == 0 ? 1.0 : m.M11, m.M22 == 0 ? 1.0 : m.M22);
+        }
+        return (1.0, 1.0);
+    }
+
+    private (double X, double Y) DipToPixels(double xDip, double yDip)
+    {
+        var (sx, sy) = DpiScale();
+        return (xDip * sx, yDip * sy);
+    }
+
+    private System.Windows.Point PixelsToDip(double xPx, double yPx)
+    {
+        var (sx, sy) = DpiScale();
+        return new System.Windows.Point(xPx / sx, yPx / sy);
+    }
+
+    /// <summary>
+    /// Places ChatPanel and HeadColumn inside the OuterLayout 2x2 grid based on
+    /// (a) the current layout mode (vertical heads column vs horizontal heads row)
+    /// and (b) the current dock corner. The chat panel is set to the cell adjacent
+    /// to the head column on the side opposite the nearest screen edge.
+    /// </summary>
+    private void ApplyDockLayout()
+    {
+        if (ChatPanel is null || HeadColumn is null) return;
+
+        var layout = _viewModel.SelectedLayoutMode;
+
+        // Default to single-row layout; we override for the horizontal layout mode below.
+        System.Windows.Controls.Grid.SetRow(ChatPanel, 0);
+        System.Windows.Controls.Grid.SetRow(HeadColumn, 0);
+        System.Windows.Controls.Grid.SetColumn(ChatPanel, 0);
+        System.Windows.Controls.Grid.SetColumn(HeadColumn, 0);
+
+        if (layout == BobbleWin.Models.ChatHeadsLayoutMode.Vertical)
+        {
+            // Heads stacked vertically -> chat panel sits LEFT or RIGHT of heads.
+            if (_hDock == HDock.Right)
+            {
+                System.Windows.Controls.Grid.SetColumn(ChatPanel, 0);
+                System.Windows.Controls.Grid.SetColumn(HeadColumn, 1);
+                ChatPanel.Margin = new Thickness(0, 0, 8, 0);
+            }
+            else
+            {
+                System.Windows.Controls.Grid.SetColumn(HeadColumn, 0);
+                System.Windows.Controls.Grid.SetColumn(ChatPanel, 1);
+                ChatPanel.Margin = new Thickness(8, 0, 0, 0);
+            }
+            // Align ChatPanel to the same vertical edge as the heads so it doesn't
+            // pop out off-screen when the heads are near the top/bottom.
+            ChatPanel.VerticalAlignment = _vDock == VDock.Top ? VerticalAlignment.Top : VerticalAlignment.Bottom;
+            ChatPanel.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
+        }
+        else
+        {
+            // Heads in a horizontal row -> chat panel sits ABOVE or BELOW heads.
+            if (_vDock == VDock.Top)
+            {
+                System.Windows.Controls.Grid.SetRow(HeadColumn, 0);
+                System.Windows.Controls.Grid.SetRow(ChatPanel, 1);
+                ChatPanel.Margin = new Thickness(0, 8, 0, 0);
+            }
+            else
+            {
+                System.Windows.Controls.Grid.SetRow(ChatPanel, 0);
+                System.Windows.Controls.Grid.SetRow(HeadColumn, 1);
+                ChatPanel.Margin = new Thickness(0, 0, 0, 8);
+            }
+            ChatPanel.HorizontalAlignment = _hDock == HDock.Right ? System.Windows.HorizontalAlignment.Right : System.Windows.HorizontalAlignment.Left;
+            ChatPanel.VerticalAlignment = VerticalAlignment.Stretch;
+        }
+    }
+
+    // -- Window-level drag: drag from anywhere except interactive controls --
+
+    private System.Windows.Point? _dragStartScreenPoint;
+    private bool _dragArmed;
+    private bool _justDragged;
+    private const double DragThreshold = 4.0;
+
+    private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _justDragged = false;
+        // Arm a potential drag whenever the user presses outside of pure-input controls.
+        // Buttons still get their click (we only call DragMove once the threshold is exceeded).
+        if (e.OriginalSource is DependencyObject dep
+            && (dep is System.Windows.Controls.TextBox || dep is System.Windows.Controls.PasswordBox))
+        {
+            _dragArmed = false;
+            _dragStartScreenPoint = null;
+            return;
+        }
+
+        _dragStartScreenPoint = PointToScreen(e.GetPosition(this));
+        _dragArmed = true;
+    }
+
+    private void Window_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_dragArmed || _dragStartScreenPoint is null) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _dragArmed = false;
+            _dragStartScreenPoint = null;
+            return;
+        }
+
+        var current = PointToScreen(e.GetPosition(this));
+        var dx = current.X - _dragStartScreenPoint.Value.X;
+        var dy = current.Y - _dragStartScreenPoint.Value.Y;
+        if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold) return;
+
+        _dragArmed = false;
+        _justDragged = true;
+
+        // If a Button (or anything else) captured the mouse, release it so DragMove() can take over.
+        var captured = Mouse.Captured;
+        if (captured is not null)
+        {
+            try { captured.ReleaseMouseCapture(); } catch { }
+        }
+
+        try
+        {
+            DragMove();
+            UpdateAnchorFromCurrentPosition();
+            RecomputeDockSidesFromScreenPosition();
+        }
+        catch
+        {
+            // DragMove throws if mouse button isn't down anymore — ignore.
+        }
+    }
+
+    private void Window_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // If we dragged, swallow the mouse-up so the captured Button doesn't fire its Click.
+        if (_justDragged)
+        {
+            e.Handled = true;
+        }
+        _dragArmed = false;
+        _justDragged = false;
+        _dragStartScreenPoint = null;
+    }
+
+    private void LayoutToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedLayoutMode = _viewModel.SelectedLayoutMode == BobbleWin.Models.ChatHeadsLayoutMode.Vertical
+            ? BobbleWin.Models.ChatHeadsLayoutMode.Horizontal
+            : BobbleWin.Models.ChatHeadsLayoutMode.Vertical;
     }
 
     private void HeadColumn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left)
-        {
-            try
-            {
-                DragMove();
-                _anchorRight = Left + ActualWidth;
-                _anchorTop = Top;
-            }
-            catch { }
-        }
+        // Legacy handler — drag is now serviced at the window level. Keep for compatibility.
     }
 
     private void ChatHead_Click(object sender, RoutedEventArgs e)
