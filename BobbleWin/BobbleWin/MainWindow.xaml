@@ -69,7 +69,8 @@
         </Storyboard>
 
         <!-- One-shot completion bounce triggered when a session transitions Running → Idle.
-             Repeats 5 cycles so the user can spot the completion even out of the corner of an eye. -->
+             Each cycle lasts 5 seconds: a ~0.62s jump followed by a 4.38s rest,
+             repeating 5 times so the user gets gentle periodic nudges. -->
         <Storyboard x:Key="CompletedJump" RepeatBehavior="5x">
             <DoubleAnimationUsingKeyFrames
                 Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)">
@@ -89,6 +90,7 @@
                         <CubicEase EasingMode="EaseOut" />
                     </EasingDoubleKeyFrame.EasingFunction>
                 </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:5" Value="0" />
             </DoubleAnimationUsingKeyFrames>
             <DoubleAnimationUsingKeyFrames
                 Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)">
@@ -96,6 +98,7 @@
                 <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="0.96" />
                 <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="1.05" />
                 <EasingDoubleKeyFrame KeyTime="0:0:0.62" Value="1" />
+                <EasingDoubleKeyFrame KeyTime="0:0:5" Value="1" />
             </DoubleAnimationUsingKeyFrames>
             <DoubleAnimationUsingKeyFrames
                 Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)">
@@ -103,6 +106,7 @@
                 <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="1.04" />
                 <EasingDoubleKeyFrame KeyTime="0:0:0.46" Value="0.95" />
                 <EasingDoubleKeyFrame KeyTime="0:0:0.62" Value="1" />
+                <EasingDoubleKeyFrame KeyTime="0:0:5" Value="1" />
             </DoubleAnimationUsingKeyFrames>
         </Storyboard>
 
