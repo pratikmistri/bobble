@@ -74,17 +74,28 @@ public sealed class ChatAttachment
     }
 }
 
-public sealed class ChatMessage
+public sealed class ChatMessage : BobbleWin.Utilities.ObservableObject
 {
+    private string _content = string.Empty;
+    private bool _isStreaming;
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public ChatMessageRole Role { get; set; }
-    public string Content { get; set; } = string.Empty;
+    public string Content
+    {
+        get => _content;
+        set => SetProperty(ref _content, value);
+    }
     public List<ChatAttachment> Attachments { get; set; } = [];
     public string? InterruptionTitle { get; set; }
     public string? InterruptionDetails { get; set; }
     public List<InterruptionAction> InterruptionActions { get; set; } = [];
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
-    public bool IsStreaming { get; set; }
+    public bool IsStreaming
+    {
+        get => _isStreaming;
+        set => SetProperty(ref _isStreaming, value);
+    }
     public bool IsNew { get; set; }
     public ChatMessageKind Kind { get; set; } = ChatMessageKind.Regular;
 

@@ -97,7 +97,7 @@ public static class CLIBackendExtensions
         {
             try
             {
-                var process = new Process
+                var process = new System.Diagnostics.Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -115,7 +115,7 @@ public static class CLIBackendExtensions
                 if (process.ExitCode == 0)
                 {
                     var path = output
-                        .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+                        .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(value => value.Trim())
                         .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
                     if (!string.IsNullOrWhiteSpace(path))

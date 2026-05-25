@@ -2,7 +2,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using BobbleWin.Models;
 using BobbleWin.ViewModels;
-using Microsoft.UI.Xaml;
+using Application = System.Windows.Forms.Application;
+using Window = System.Windows.Window;
 
 namespace BobbleWin.Services;
 
@@ -68,8 +69,9 @@ public sealed class TrayIconService
         var showItem = new ToolStripMenuItem("Show BobbleWin");
         showItem.Click += (_, _) =>
         {
-            _window.DispatcherQueue.TryEnqueue(() =>
+            _window.Dispatcher.Invoke(() =>
             {
+                _window.Show();
                 _window.Activate();
             });
         };
@@ -77,11 +79,12 @@ public sealed class TrayIconService
         var quitItem = new ToolStripMenuItem("Quit BobbleWin");
         quitItem.Click += (_, _) =>
         {
-            _window.DispatcherQueue.TryEnqueue(() =>
+            _window.Dispatcher.Invoke(() =>
             {
                 _manager.FlushPersistence();
                 _manager.TerminateAll();
-                Application.Exit();
+                if (_notifyIcon is not null) { _notifyIcon.Visible = false; }
+                System.Windows.Application.Current.Shutdown();
             });
         };
 
@@ -95,7 +98,7 @@ public sealed class TrayIconService
         _notifyIcon.ContextMenuStrip = menu;
         _notifyIcon.DoubleClick += (_, _) =>
         {
-            _window.DispatcherQueue.TryEnqueue(() => _window.Activate());
+            _window.Dispatcher.Invoke(() => { _window.Show(); _window.Activate(); });
         };
 
         UpdateSelectedProvider();

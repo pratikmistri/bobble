@@ -1,6 +1,7 @@
+using System.Windows;
 using BobbleWin.Services;
 using BobbleWin.ViewModels;
-using Microsoft.UI.Xaml;
+using Application = System.Windows.Application;
 
 namespace BobbleWin;
 
@@ -11,17 +12,36 @@ public partial class App : Application
 
     public ChatHeadsManager Manager { get; } = new();
 
-    public App()
+    protected override void OnStartup(StartupEventArgs e)
     {
-        InitializeComponent();
-    }
+        base.OnStartup(e);
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
-    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            try
+            {
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BobbleWin_crash.txt"),
+                    args.Exception.ToString());
+            }
+            catch { }
+        };
+
         _window = new MainWindow(Manager);
-        _window.Activate();
+        _window.Show();
 
         _trayIconService = new TrayIconService(Manager, _window);
         _trayIconService.Install();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            Manager.FlushPersistence();
+            Manager.TerminateAll();
+        }
+        catch { }
+        base.OnExit(e);
     }
 }

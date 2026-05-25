@@ -90,7 +90,6 @@ public sealed class MainWindowViewModel : ObservableObject
 
         _manager.SessionAdded += session =>
         {
-            SelectedSessionId = session.Id;
             UpdateSelectedSessionViewModel();
             RaisePropertyChanged(nameof(SelectedProvider));
         };
@@ -111,10 +110,6 @@ public sealed class MainWindowViewModel : ObservableObject
         if (_manager.Sessions.Count == 0)
         {
             _manager.AddSession();
-        }
-        else if (_manager.Sessions.LastOrDefault() is { } latest)
-        {
-            SelectedSessionId = latest.Id;
         }
 
         UpdateSelectedSessionViewModel();

@@ -1,5 +1,5 @@
-using Microsoft.UI;
-using Microsoft.UI.Xaml.Media;
+using System.Windows.Media;
+using Color = System.Windows.Media.Color;
 
 namespace BobbleWin.Utilities;
 

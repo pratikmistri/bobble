@@ -24,7 +24,7 @@ public sealed class CLIProcessManager
     private readonly bool _usesStdinPrompt;
     private readonly CLIProcessLaunchPurpose _launchPurpose;
 
-    private Process? _process;
+    private System.Diagnostics.Process? _process;
 
     public event Action<string>? OnTextChunk;
     public event Action<string>? OnResult;
@@ -78,7 +78,7 @@ public sealed class CLIProcessManager
             return;
         }
 
-        var process = new Process
+        var process = new System.Diagnostics.Process
         {
             StartInfo = new ProcessStartInfo
             {

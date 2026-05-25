@@ -1,19 +1,21 @@
-using BobbleWin.Models;
+﻿using BobbleWin.Models;
 using BobbleWin.Utilities;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Media;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Data;
+
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 
 namespace BobbleWin.Views;
 
 public sealed class ProviderDisplayConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is CLIBackend backend ? backend.DisplayName() : string.Empty;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return CLIBackend.Codex;
     }
@@ -21,12 +23,12 @@ public sealed class ProviderDisplayConverter : IValueConverter
 
 public sealed class LayoutTitleConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is ChatHeadsLayoutMode mode ? mode.MenuTitle() : string.Empty;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return ChatHeadsLayoutMode.Vertical;
     }
@@ -34,7 +36,7 @@ public sealed class LayoutTitleConverter : IValueConverter
 
 public sealed class MessageRoleToAlignmentConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not ChatMessageRole role)
         {
@@ -51,7 +53,7 @@ public sealed class MessageRoleToAlignmentConverter : IValueConverter
         };
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return ChatMessageRole.Assistant;
     }
@@ -59,7 +61,7 @@ public sealed class MessageRoleToAlignmentConverter : IValueConverter
 
 public sealed class MessageRoleToBubbleBrushConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not ChatMessageRole role)
         {
@@ -76,7 +78,7 @@ public sealed class MessageRoleToBubbleBrushConverter : IValueConverter
         };
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return ChatMessageRole.Assistant;
     }
@@ -84,12 +86,12 @@ public sealed class MessageRoleToBubbleBrushConverter : IValueConverter
 
 public sealed class NullToCollapsedConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return null!;
     }
@@ -97,12 +99,12 @@ public sealed class NullToCollapsedConverter : IValueConverter
 
 public sealed class NullToVisibleConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is null ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return null!;
     }
@@ -110,7 +112,7 @@ public sealed class NullToVisibleConverter : IValueConverter
 
 public sealed class BooleanToVisibilityConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         var invert = parameter?.ToString() == "invert";
         var state = value is bool boolean && boolean;
@@ -122,8 +124,9 @@ public sealed class BooleanToVisibilityConverter : IValueConverter
         return state ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return false;
     }
 }
+

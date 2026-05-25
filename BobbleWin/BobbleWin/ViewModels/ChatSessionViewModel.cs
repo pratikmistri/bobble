@@ -328,6 +328,19 @@ public sealed class ChatSessionViewModel : ObservableObject
         });
     }
 
+    private static void OnUi(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            dispatcher.BeginInvoke(action);
+        }
+    }
+
     private void ConfigureTransportCallbacks(IConversationTransport transport)
     {
         if (ReferenceEquals(_callbackTransport, transport))
@@ -337,34 +350,34 @@ public sealed class ChatSessionViewModel : ObservableObject
 
         _callbackTransport = transport;
 
-        transport.OnTextChunk += text =>
+        transport.OnTextChunk += text => OnUi(() =>
         {
             lock (_sync)
             {
                 ApplyAssistantDelta(text);
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnResult += text =>
+        transport.OnResult += text => OnUi(() =>
         {
             lock (_sync)
             {
                 CompleteAssistantMessage(text);
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnEventText += text =>
+        transport.OnEventText += text => OnUi(() =>
         {
             lock (_sync)
             {
                 AppendSystemEvent(text);
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnInterruption += interruption =>
+        transport.OnInterruption += interruption => OnUi(() =>
         {
             lock (_sync)
             {
@@ -376,9 +389,9 @@ public sealed class ChatSessionViewModel : ObservableObject
                 }
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnComplete += () =>
+        transport.OnComplete += () => OnUi(() =>
         {
             lock (_sync)
             {
@@ -387,9 +400,9 @@ public sealed class ChatSessionViewModel : ObservableObject
                 HandleTurnLifecycleCompletion();
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnSessionId += newId =>
+        transport.OnSessionId += newId => OnUi(() =>
         {
             lock (_sync)
             {
@@ -399,18 +412,18 @@ public sealed class ChatSessionViewModel : ObservableObject
                     NotifyUpdate();
                 }
             }
-        };
+        });
 
-        transport.OnAssistantMessageStarted += () =>
+        transport.OnAssistantMessageStarted += () => OnUi(() =>
         {
             lock (_sync)
             {
                 StartAssistantMessageIfNeeded();
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnTurnCompleted += () =>
+        transport.OnTurnCompleted += () => OnUi(() =>
         {
             lock (_sync)
             {
@@ -418,9 +431,9 @@ public sealed class ChatSessionViewModel : ObservableObject
                 _pendingTextReplyInterruptionId = null;
                 NotifyUpdate();
             }
-        };
+        });
 
-        transport.OnError += error =>
+        transport.OnError += error => OnUi(() =>
         {
             lock (_sync)
             {
@@ -437,7 +450,7 @@ public sealed class ChatSessionViewModel : ObservableObject
                 HandleTurnLifecycleCompletion(forceReset: true);
                 NotifyUpdate();
             }
-        };
+        });
     }
 
     private IConversationTransport TransportForCurrentConversation(string executablePath)

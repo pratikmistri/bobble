@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 
 namespace BobbleWin.Utilities;
 
@@ -15,12 +16,28 @@ public abstract class ObservableObject : INotifyPropertyChanged
         }
 
         storage = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        RaiseOnDispatcher(propertyName);
         return true;
     }
 
     protected void RaisePropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        RaiseOnDispatcher(propertyName);
+    }
+
+    private void RaiseOnDispatcher(string? propertyName)
+    {
+        var handler = PropertyChanged;
+        if (handler is null) return;
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            handler(this, new PropertyChangedEventArgs(propertyName));
+        }
+        else
+        {
+            dispatcher.BeginInvoke(new Action(() => handler(this, new PropertyChangedEventArgs(propertyName))));
+        }
     }
 }
