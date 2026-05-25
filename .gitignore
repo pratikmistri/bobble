@@ -15,3 +15,17 @@ learnings.md
 # Swift Package Manager
 .build/
 Packages/
+
+# .NET / Visual Studio
+**/bin/
+**/obj/
+**/.vs/
+*.user
+*.suo
+*.binlog
+*_wpftmp.*
+**/BobbleWin/out.txt
+**/BobbleWin/stdout.txt
+**/BobbleWin/stdout.log
+**/BobbleWin/stderr.txt
+BobbleWin/global.json

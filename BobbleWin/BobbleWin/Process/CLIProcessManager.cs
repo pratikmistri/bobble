@@ -231,6 +231,18 @@ public sealed class CLIProcessManager
             args.AddRange(["--no-ask-user", "--allow-all"]);
         }
 
+        if (!string.IsNullOrWhiteSpace(_sessionId))
+        {
+            if (_isResume)
+            {
+                args.Add($"--resume={_sessionId}");
+            }
+            else
+            {
+                args.AddRange(["--session-id", _sessionId]);
+            }
+        }
+
         args.AddRange(modelArguments);
         return args;
     }
