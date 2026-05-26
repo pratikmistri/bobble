@@ -168,6 +168,12 @@ public partial class MainWindow : Window
     private void AnimateChatPanelVisibility(bool show)
     {
         if (ChatPanel is null) return;
+
+        // If the history flyout is open, dismiss it whenever the chat panel
+        // appears so the two panels don't overlap visually.
+        if (show && HistoryPopup is { IsOpen: true })
+            AnimateHistoryPopupVisibility(false);
+
         UpdatePanelTransformOrigin(ChatPanel);
         _chatPanelHideSb?.Stop(ChatPanel);
         _chatPanelShowSb?.Stop(ChatPanel);
