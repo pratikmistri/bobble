@@ -29,3 +29,4 @@ Packages/
 **/BobbleWin/stdout.log
 **/BobbleWin/stderr.txt
 BobbleWin/global.json
+BobbleWin/BobbleWin/err.txt
