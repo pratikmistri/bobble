@@ -35,6 +35,12 @@ public partial class MainWindow : Window
         SizeChanged += OnSizeChanged;
         MessagesListView.Loaded += MessagesListView_Loaded;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        // Reposition the history flyout whenever its content size changes
+        // (initial layout pass, history items added/removed, etc.).
+        HistoryPopupBorder.SizeChanged += (_, __) =>
+        {
+            if (HistoryPopup.IsOpen) PositionHistoryPopup();
+        };
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
