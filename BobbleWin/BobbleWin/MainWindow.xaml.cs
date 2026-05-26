@@ -60,13 +60,24 @@ public partial class MainWindow : Window
         // has measured). Compute from the Border's intended dimensions plus
         // its drop-shadow gutter (Margin) instead.
         var bm = HistoryPopupBorder.Margin;
+
+        // Force a measure pass so DesiredSize is populated even on the very
+        // first callback (before WPF has laid out the popup content). Without
+        // this, ActualHeight and popupSize.Height are both 0 on the first
+        // call, the height fallback (80) underestimates, and the popup ends
+        // up vertically mis-centered.
+        HistoryPopupBorder.Measure(new System.Windows.Size(
+            double.PositiveInfinity, double.PositiveInfinity));
+
         double borderW = HistoryPopupBorder.ActualWidth > 0
             ? HistoryPopupBorder.ActualWidth
-            : HistoryPopupBorder.Width;
+            : (HistoryPopupBorder.DesiredSize.Width > 0
+                ? HistoryPopupBorder.DesiredSize.Width
+                : HistoryPopupBorder.Width);
         if (double.IsNaN(borderW) || borderW <= 0) borderW = 280;
         double borderH = HistoryPopupBorder.ActualHeight > 0
             ? HistoryPopupBorder.ActualHeight
-            : 0;
+            : HistoryPopupBorder.DesiredSize.Height;
         double effectivePopupW = borderW + bm.Left + bm.Right;
         double effectivePopupH = (borderH > 0 ? borderH : Math.Max(popupSize.Height, 80))
                                  + bm.Top + bm.Bottom;
