@@ -73,20 +73,39 @@ public partial class MainWindow : Window
 
         double visualGap = 6;
 
+        // The chat-head avatars in HeadColumn are wider than the control
+        // buttons, so anchoring to the History button alone leaves the
+        // avatars protruding into the popup. Compute the head column's
+        // bounds in the button's coordinate space and clear that instead.
+        double columnLeftInTarget = 0;
+        double columnRightInTarget = targetSize.Width;
+        try
+        {
+            if (HeadColumn is not null && HistoryButton.IsLoaded && HeadColumn.IsLoaded)
+            {
+                var t = HeadColumn.TransformToVisual(HistoryButton);
+                var p = t.Transform(new System.Windows.Point(0, 0));
+                columnLeftInTarget = p.X;
+                columnRightInTarget = p.X + HeadColumn.ActualWidth;
+            }
+        }
+        catch { /* fall back to button bounds */ }
+
         // Border-center-Y == target-center-Y. Border margin is symmetric, so
         // popup-center-Y == Border-center-Y → y = (targetH - popupH) / 2.
         double y = (targetSize.Height - effectivePopupH) / 2.0;
 
         // Preferred side: opposite the dock edge. We want the visible Border's
-        // edge (NOT the popup-window edge) to sit `visualGap` from the button.
+        // edge (NOT the popup-window edge) to sit `visualGap` from the head
+        // column edge (not the button), so chat-head avatars don't overlap.
         // Border-right in popup-coords = popupW - bm.Right.
         // Border-left in popup-coords  = bm.Left.
         double xPreferred = _hDock == HDock.Right
-            ? -effectivePopupW + bm.Right - visualGap          // popup to the LEFT of target
-            : targetSize.Width - bm.Left + visualGap;          // popup to the RIGHT of target
+            ? columnLeftInTarget - visualGap - effectivePopupW + bm.Right     // popup to the LEFT of column
+            : columnRightInTarget + visualGap - bm.Left;                       // popup to the RIGHT of column
         double xFallback = _hDock == HDock.Right
-            ? targetSize.Width - bm.Left + visualGap
-            : -effectivePopupW + bm.Right - visualGap;
+            ? columnRightInTarget + visualGap - bm.Left
+            : columnLeftInTarget - visualGap - effectivePopupW + bm.Right;
 
         // Primary axis = Vertical → WPF nudges Y to keep the popup on-screen,
         // and falls back to xFallback if xPreferred overflows horizontally.
