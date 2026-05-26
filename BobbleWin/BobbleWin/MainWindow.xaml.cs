@@ -817,7 +817,12 @@ public partial class MainWindow : Window
 
     private void HistoryButton_Click(object sender, RoutedEventArgs e)
     {
-        AnimateHistoryPopupVisibility(!HistoryPopup.IsOpen);
+        bool opening = !HistoryPopup.IsOpen;
+        // If we're opening the history flyout while the chat panel is showing
+        // a session, dismiss the chat panel first so the two don't overlap.
+        if (opening && _viewModel.SelectedSessionViewModel is not null)
+            _viewModel.SelectedSessionId = null;
+        AnimateHistoryPopupVisibility(opening);
     }
 
     private void RestoreHistory_Click(object sender, RoutedEventArgs e)
