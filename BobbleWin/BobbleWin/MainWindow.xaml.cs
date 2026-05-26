@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -44,6 +45,129 @@ public partial class MainWindow : Window
             ApplyDockLayout();
             Dispatcher.BeginInvoke(new Action(ApplyAnchor), System.Windows.Threading.DispatcherPriority.Loaded);
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedSessionViewModel))
+        {
+            AnimateChatPanelVisibility(_viewModel.SelectedSessionViewModel is not null);
+        }
+    }
+
+    // ---- Panel show/hide animations ----
+    // Drives ChatPanel and HistoryPopup with a fade + scale + slide transition.
+    // The origin/translation direction is chosen so the panel grows from the
+    // edge nearest the chat-head column.
+
+    private System.Windows.Media.Animation.Storyboard? _chatPanelShowSb;
+    private System.Windows.Media.Animation.Storyboard? _chatPanelHideSb;
+
+    private void AnimateChatPanelVisibility(bool show)
+    {
+        if (ChatPanel is null) return;
+        UpdatePanelTransformOrigin(ChatPanel);
+        _chatPanelHideSb?.Stop(ChatPanel);
+        _chatPanelShowSb?.Stop(ChatPanel);
+
+        if (show)
+        {
+            ChatPanel.Visibility = Visibility.Visible;
+            _chatPanelShowSb = BuildPanelShowStoryboard();
+            _chatPanelShowSb.Begin(ChatPanel, true);
+        }
+        else
+        {
+            if (ChatPanel.Visibility != Visibility.Visible) return;
+            _chatPanelHideSb = BuildPanelHideStoryboard();
+            _chatPanelHideSb.Completed += (_, _) =>
+            {
+                if (_viewModel.SelectedSessionViewModel is null)
+                    ChatPanel.Visibility = Visibility.Collapsed;
+            };
+            _chatPanelHideSb.Begin(ChatPanel, true);
+        }
+    }
+
+    private void AnimateHistoryPopupVisibility(bool show)
+    {
+        if (HistoryPopup is null) return;
+        UpdatePanelTransformOrigin(HistoryPopup);
+
+        if (show)
+        {
+            HistoryPopup.Visibility = Visibility.Visible;
+            BuildPanelShowStoryboard().Begin(HistoryPopup, true);
+        }
+        else
+        {
+            if (HistoryPopup.Visibility != Visibility.Visible) return;
+            var sb = BuildPanelHideStoryboard();
+            sb.Completed += (_, _) => HistoryPopup.Visibility = Visibility.Collapsed;
+            sb.Begin(HistoryPopup, true);
+        }
+    }
+
+    private void UpdatePanelTransformOrigin(System.Windows.FrameworkElement panel)
+    {
+        // Anchor the scale origin to the edge nearest the chat-head column so
+        // the panel appears to emanate from the heads.
+        double ox = _hDock == HDock.Right ? 1.0 : 0.0;
+        double oy = _vDock == VDock.Top ? 0.0 : 1.0;
+        panel.RenderTransformOrigin = new System.Windows.Point(ox, oy);
+
+        if (panel.RenderTransform is System.Windows.Media.TransformGroup tg
+            && tg.Children.Count >= 2
+            && tg.Children[1] is System.Windows.Media.TranslateTransform)
+        {
+            // We reset Translate values at Begin via the storyboard,
+            // but flip sign so the slide-in direction follows the dock.
+            // (Storyboard "From" values are set in BuildPanelShowStoryboard.)
+        }
+    }
+
+    private System.Windows.Media.Animation.Storyboard BuildPanelShowStoryboard()
+    {
+        var dx = _hDock == HDock.Right ? 20.0 : -20.0;
+        var dy = _vDock == VDock.Top ? -8.0 : 8.0;
+        var dur = new Duration(TimeSpan.FromMilliseconds(220));
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+
+        var sb = new System.Windows.Media.Animation.Storyboard();
+        sb.Children.Add(MakeAnim("Opacity", 0.0, 1.0, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)", 0.92, 1.0, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)", 0.92, 1.0, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)", dx, 0.0, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)", dy, 0.0, dur, ease));
+        return sb;
+    }
+
+    private System.Windows.Media.Animation.Storyboard BuildPanelHideStoryboard()
+    {
+        var dx = _hDock == HDock.Right ? 16.0 : -16.0;
+        var dy = _vDock == VDock.Top ? -6.0 : 6.0;
+        var dur = new Duration(TimeSpan.FromMilliseconds(160));
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn };
+
+        var sb = new System.Windows.Media.Animation.Storyboard();
+        sb.Children.Add(MakeAnim("Opacity", null, 0.0, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)", null, 0.94, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)", null, 0.94, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)", null, dx, dur, ease));
+        sb.Children.Add(MakeAnim("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)", null, dy, dur, ease));
+        return sb;
+    }
+
+    private static System.Windows.Media.Animation.DoubleAnimation MakeAnim(
+        string propertyPath, double? from, double to, Duration dur,
+        System.Windows.Media.Animation.IEasingFunction ease)
+    {
+        var a = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            To = to,
+            Duration = dur,
+            EasingFunction = ease,
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
+        };
+        if (from.HasValue) a.From = from.Value;
+        System.Windows.Media.Animation.Storyboard.SetTargetProperty(a, new PropertyPath(propertyPath));
+        return a;
     }
 
     private System.Windows.Controls.ScrollViewer? _messagesScrollViewer;
@@ -224,6 +348,10 @@ public partial class MainWindow : Window
 
         // Re-clamp + re-place when the head column grows/shrinks (e.g., as sessions are added).
         HeadColumn.SizeChanged += (_, __) => ApplyAnchor();
+
+        // Sync initial ChatPanel visibility (in case a session was selected before Loaded).
+        if (_viewModel.SelectedSessionViewModel is not null)
+            AnimateChatPanelVisibility(true);
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -558,9 +686,7 @@ public partial class MainWindow : Window
 
     private void HistoryButton_Click(object sender, RoutedEventArgs e)
     {
-        HistoryPopup.Visibility = HistoryPopup.Visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        AnimateHistoryPopupVisibility(HistoryPopup.Visibility != Visibility.Visible);
     }
 
     private void RestoreHistory_Click(object sender, RoutedEventArgs e)
@@ -571,7 +697,7 @@ public partial class MainWindow : Window
             if (session is not null)
             {
                 _viewModel.RestoreHistorySessionCommand.Execute(session);
-                HistoryPopup.Visibility = Visibility.Collapsed;
+                AnimateHistoryPopupVisibility(false);
             }
         }
     }
