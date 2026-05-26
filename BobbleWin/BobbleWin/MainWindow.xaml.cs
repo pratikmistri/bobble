@@ -124,15 +124,13 @@ public partial class MainWindow : Window
         if (!HistoryButton.IsLoaded) return;
 
         HistoryPopupBorder.UpdateLayout();
-        double popupW = HistoryPopupBorder.ActualWidth > 0
+        double borderW = HistoryPopupBorder.ActualWidth > 0
             ? HistoryPopupBorder.ActualWidth
             : HistoryPopupBorder.Width;
-        double popupH = HistoryPopupBorder.ActualHeight > 0
+        double borderH = HistoryPopupBorder.ActualHeight > 0
             ? HistoryPopupBorder.ActualHeight
             : HistoryPopupBorder.MaxHeight;
-        // Add the Border's Margin to account for the drop-shadow gutter.
-        popupW += HistoryPopupBorder.Margin.Left + HistoryPopupBorder.Margin.Right;
-        popupH += HistoryPopupBorder.Margin.Top + HistoryPopupBorder.Margin.Bottom;
+        var bm = HistoryPopupBorder.Margin;
 
         // Button screen position (device pixels → DIPs).
         System.Windows.Point btnTLpx;
@@ -148,18 +146,23 @@ public partial class MainWindow : Window
         var btnBR = PixelsToDip(btnBRpx.X, btnBRpx.Y);
         double btnCenterY = (btnTL.Y + btnBR.Y) / 2.0;
 
-        const double gap = 8;
-        double left = _hDock == HDock.Right
-            ? btnTL.X - gap - popupW
-            : btnBR.X + gap;
-        double top = btnCenterY - popupH / 2.0;
+        // We position by the visible Border's edge. The popup window is larger
+        // than the Border by Margin on each side (drop-shadow gutter); subtract
+        // those when computing HorizontalOffset/VerticalOffset.
+        const double visualGap = 6;
+        double borderLeft = _hDock == HDock.Right
+            ? btnTL.X - visualGap - borderW
+            : btnBR.X + visualGap;
+        double borderTop = btnCenterY - borderH / 2.0;
 
+        // Clamp the visible Border to the work area.
         var wa = GetWorkAreaForPoint(btnTL.X, btnTL.Y);
-        left = Math.Max(wa.Left + 4, Math.Min(left, wa.Right - popupW - 4));
-        top = Math.Max(wa.Top + 4, Math.Min(top, wa.Bottom - popupH - 4));
+        borderLeft = Math.Max(wa.Left + 4, Math.Min(borderLeft, wa.Right - borderW - 4));
+        borderTop = Math.Max(wa.Top + 4, Math.Min(borderTop, wa.Bottom - borderH - 4));
 
-        HistoryPopup.HorizontalOffset = left;
-        HistoryPopup.VerticalOffset = top;
+        // Translate Border-edge coordinates to popup-window offsets.
+        HistoryPopup.HorizontalOffset = borderLeft - bm.Left;
+        HistoryPopup.VerticalOffset = borderTop - bm.Top;
     }
 
     private void UpdatePanelTransformOrigin(System.Windows.FrameworkElement panel)
