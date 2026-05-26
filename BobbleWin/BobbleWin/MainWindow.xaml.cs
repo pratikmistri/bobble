@@ -56,22 +56,37 @@ public partial class MainWindow : Window
     private System.Windows.Controls.Primitives.CustomPopupPlacement[] HistoryPopupPlacement(
         System.Windows.Size popupSize, System.Windows.Size targetSize, System.Windows.Point offset)
     {
-        // popupSize is the full popup-window size (Border + its Margin gutter).
-        // Border's visible rect inside the popup window starts at (bm.Left, bm.Top).
+        // popupSize is unreliable on the first invocation (before the Border
+        // has measured). Compute from the Border's intended dimensions plus
+        // its drop-shadow gutter (Margin) instead.
         var bm = HistoryPopupBorder.Margin;
+        double borderW = HistoryPopupBorder.ActualWidth > 0
+            ? HistoryPopupBorder.ActualWidth
+            : HistoryPopupBorder.Width;
+        if (double.IsNaN(borderW) || borderW <= 0) borderW = 280;
+        double borderH = HistoryPopupBorder.ActualHeight > 0
+            ? HistoryPopupBorder.ActualHeight
+            : 0;
+        double effectivePopupW = borderW + bm.Left + bm.Right;
+        double effectivePopupH = (borderH > 0 ? borderH : Math.Max(popupSize.Height, 80)) + bm.Top + bm.Bottom - (borderH > 0 ? 0 : 0);
+        if (effectivePopupH <= 0) effectivePopupH = popupSize.Height;
+
         double visualGap = 6;
 
-        // Border-center-Y == target-center-Y → popup.y = (targetH - popupH) / 2.
-        // (Border margin is symmetric, so Border-center == popup-center vertically.)
-        double y = (targetSize.Height - popupSize.Height) / 2.0;
+        // Border-center-Y == target-center-Y. Border margin is symmetric, so
+        // popup-center-Y == Border-center-Y → y = (targetH - popupH) / 2.
+        double y = (targetSize.Height - effectivePopupH) / 2.0;
 
-        // Preferred side: opposite the dock edge.
+        // Preferred side: opposite the dock edge. We want the visible Border's
+        // edge (NOT the popup-window edge) to sit `visualGap` from the button.
+        // Border-right in popup-coords = popupW - bm.Right.
+        // Border-left in popup-coords  = bm.Left.
         double xPreferred = _hDock == HDock.Right
-            ? -popupSize.Width + bm.Right - visualGap         // popup to the LEFT of target
+            ? -effectivePopupW + bm.Right - visualGap          // popup to the LEFT of target
             : targetSize.Width - bm.Left + visualGap;          // popup to the RIGHT of target
         double xFallback = _hDock == HDock.Right
             ? targetSize.Width - bm.Left + visualGap
-            : -popupSize.Width + bm.Right - visualGap;
+            : -effectivePopupW + bm.Right - visualGap;
 
         // Primary axis = Vertical → WPF nudges Y to keep the popup on-screen,
         // and falls back to xFallback if xPreferred overflows horizontally.
