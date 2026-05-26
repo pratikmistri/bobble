@@ -35,11 +35,54 @@ public partial class MainWindow : Window
         SizeChanged += OnSizeChanged;
         MessagesListView.Loaded += MessagesListView_Loaded;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        // Reposition the history flyout whenever its content size changes
-        // (initial layout pass, history items added/removed, etc.).
+
+        // Wire up Custom placement for the history flyout. The callback runs
+        // every time WPF needs to (re)position the popup, including after the
+        // hosted Border measures, so we don't have to chase timing ourselves.
+        HistoryPopup.CustomPopupPlacementCallback = HistoryPopupPlacement;
         HistoryPopupBorder.SizeChanged += (_, __) =>
         {
-            if (HistoryPopup.IsOpen) PositionHistoryPopup();
+            if (HistoryPopup.IsOpen)
+            {
+                // Force WPF to invoke the placement callback again now that
+                // the Border has a measured size.
+                var v = HistoryPopup.HorizontalOffset;
+                HistoryPopup.HorizontalOffset = v + 0.001;
+                HistoryPopup.HorizontalOffset = v;
+            }
+        };
+    }
+
+    private System.Windows.Controls.Primitives.CustomPopupPlacement[] HistoryPopupPlacement(
+        System.Windows.Size popupSize, System.Windows.Size targetSize, System.Windows.Point offset)
+    {
+        // popupSize is the full popup-window size (Border + its Margin gutter).
+        // Border's visible rect inside the popup window starts at (bm.Left, bm.Top).
+        var bm = HistoryPopupBorder.Margin;
+        double visualGap = 6;
+
+        // Border-center-Y == target-center-Y → popup.y = (targetH - popupH) / 2.
+        // (Border margin is symmetric, so Border-center == popup-center vertically.)
+        double y = (targetSize.Height - popupSize.Height) / 2.0;
+
+        // Preferred side: opposite the dock edge.
+        double xPreferred = _hDock == HDock.Right
+            ? -popupSize.Width + bm.Right - visualGap         // popup to the LEFT of target
+            : targetSize.Width - bm.Left + visualGap;          // popup to the RIGHT of target
+        double xFallback = _hDock == HDock.Right
+            ? targetSize.Width - bm.Left + visualGap
+            : -popupSize.Width + bm.Right - visualGap;
+
+        // Primary axis = Vertical → WPF nudges Y to keep the popup on-screen,
+        // and falls back to xFallback if xPreferred overflows horizontally.
+        return new[]
+        {
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new System.Windows.Point(xPreferred, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Vertical),
+            new System.Windows.Controls.Primitives.CustomPopupPlacement(
+                new System.Windows.Point(xFallback, y),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Vertical),
         };
     }
 
@@ -101,12 +144,7 @@ public partial class MainWindow : Window
             // centered on the button.
             HistoryPopupBorder.RenderTransformOrigin =
                 new System.Windows.Point(_hDock == HDock.Right ? 1.0 : 0.0, 0.5);
-
-            // Open first so the popup is realized in the visual tree, then
-            // position it based on its measured size on the next layout pass.
             HistoryPopup.IsOpen = true;
-            Dispatcher.BeginInvoke(new Action(PositionHistoryPopup),
-                System.Windows.Threading.DispatcherPriority.Loaded);
             BuildPanelShowStoryboard().Begin(HistoryPopupBorder, true);
         }
         else
@@ -124,53 +162,6 @@ public partial class MainWindow : Window
     /// dock edge, then clamped to the active screen's work area. When the content
     /// exceeds MaxHeight, the inner ScrollViewer takes over.
     /// </summary>
-    private void PositionHistoryPopup()
-    {
-        if (HistoryPopup is null || HistoryButton is null || HistoryPopupBorder is null) return;
-        if (!HistoryButton.IsLoaded) return;
-
-        HistoryPopupBorder.UpdateLayout();
-        double borderW = HistoryPopupBorder.ActualWidth > 0
-            ? HistoryPopupBorder.ActualWidth
-            : HistoryPopupBorder.Width;
-        double borderH = HistoryPopupBorder.ActualHeight > 0
-            ? HistoryPopupBorder.ActualHeight
-            : HistoryPopupBorder.MaxHeight;
-        var bm = HistoryPopupBorder.Margin;
-
-        // Button screen position (device pixels → DIPs).
-        System.Windows.Point btnTLpx;
-        System.Windows.Point btnBRpx;
-        try
-        {
-            btnTLpx = HistoryButton.PointToScreen(new System.Windows.Point(0, 0));
-            btnBRpx = HistoryButton.PointToScreen(new System.Windows.Point(HistoryButton.ActualWidth, HistoryButton.ActualHeight));
-        }
-        catch { return; }
-
-        var btnTL = PixelsToDip(btnTLpx.X, btnTLpx.Y);
-        var btnBR = PixelsToDip(btnBRpx.X, btnBRpx.Y);
-        double btnCenterY = (btnTL.Y + btnBR.Y) / 2.0;
-
-        // We position by the visible Border's edge. The popup window is larger
-        // than the Border by Margin on each side (drop-shadow gutter); subtract
-        // those when computing HorizontalOffset/VerticalOffset.
-        const double visualGap = 6;
-        double borderLeft = _hDock == HDock.Right
-            ? btnTL.X - visualGap - borderW
-            : btnBR.X + visualGap;
-        double borderTop = btnCenterY - borderH / 2.0;
-
-        // Clamp the visible Border to the work area.
-        var wa = GetWorkAreaForPoint(btnTL.X, btnTL.Y);
-        borderLeft = Math.Max(wa.Left + 4, Math.Min(borderLeft, wa.Right - borderW - 4));
-        borderTop = Math.Max(wa.Top + 4, Math.Min(borderTop, wa.Bottom - borderH - 4));
-
-        // Translate Border-edge coordinates to popup-window offsets.
-        HistoryPopup.HorizontalOffset = borderLeft - bm.Left;
-        HistoryPopup.VerticalOffset = borderTop - bm.Top;
-    }
-
     private void UpdatePanelTransformOrigin(System.Windows.FrameworkElement panel)
     {
         // Anchor the scale origin to the edge nearest the chat-head column so
@@ -465,7 +456,13 @@ public partial class MainWindow : Window
 
         // Keep the history flyout glued to the history button as it moves.
         if (HistoryPopup is { IsOpen: true })
-            PositionHistoryPopup();
+        {
+            // Bump HorizontalOffset to force WPF to re-invoke the placement
+            // callback now that the button has moved.
+            var v = HistoryPopup.HorizontalOffset;
+            HistoryPopup.HorizontalOffset = v + 0.001;
+            HistoryPopup.HorizontalOffset = v;
+        }
     }
 
     private void UpdateAnchorFromCurrentPosition()

@@ -546,12 +546,11 @@
         <!-- History flyout panel. Hosted in a Popup so it can float outside the
              window bounds and be anchored precisely to the history button. -->
         <Popup x:Name="HistoryPopup"
-               Placement="Absolute"
+               Placement="Custom"
+               PlacementTarget="{Binding ElementName=HistoryButton}"
                AllowsTransparency="True"
                StaysOpen="True"
-               PopupAnimation="None"
-               HorizontalOffset="0"
-               VerticalOffset="0">
+               PopupAnimation="None">
             <Border x:Name="HistoryPopupBorder"
                     Width="280"
                     MaxHeight="420"
