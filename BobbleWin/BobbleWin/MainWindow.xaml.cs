@@ -118,7 +118,7 @@ public partial class MainWindow : Window
         // breathing-room offset on that side so the popup sits clear of the
         // head column regardless of measure timing.
         if (_hDock == HDock.Right)
-            extraToClearColumn = Math.Max(extraToClearColumn, 60) + 60;
+            extraToClearColumn = Math.Max(extraToClearColumn, 60) + 60 + 32;
 
         // Border-center-Y == target-center-Y. Border margin is symmetric, so
         // popup-center-Y == Border-center-Y → y = (targetH - popupH) / 2.
