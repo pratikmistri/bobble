@@ -68,55 +68,58 @@ public partial class MainWindow : Window
             ? HistoryPopupBorder.ActualHeight
             : 0;
         double effectivePopupW = borderW + bm.Left + bm.Right;
-        double effectivePopupH = (borderH > 0 ? borderH : Math.Max(popupSize.Height, 80)) + bm.Top + bm.Bottom - (borderH > 0 ? 0 : 0);
+        double effectivePopupH = (borderH > 0 ? borderH : Math.Max(popupSize.Height, 80))
+                                 + bm.Top + bm.Bottom;
         if (effectivePopupH <= 0) effectivePopupH = popupSize.Height;
 
-        double visualGap = 6;
+        const double visualGap = 6;
 
-        // The chat-head avatars in HeadColumn are wider than the control
-        // buttons, so anchoring to the History button alone leaves the
-        // avatars protruding into the popup. Compute the head column's
-        // bounds in the button's coordinate space and clear that instead.
-        double columnLeftInTarget = 0;
-        double columnRightInTarget = targetSize.Width;
+        // Compute how far the head column extends past the History button on
+        // the side facing the popup. Chathead avatars are wider than control
+        // buttons, so we must clear the column's outer edge, not just the
+        // button. Use screen-space anchoring (PointToScreen is reliable inside
+        // the placement callback; TransformToVisual can return identity if a
+        // transform isn't yet in place).
+        double extraToClearColumn = 0;
         try
         {
-            if (HeadColumn is not null && HistoryButton.IsLoaded && HeadColumn.IsLoaded)
+            if (HeadColumn is not null && HistoryButton is not null)
             {
-                var t = HeadColumn.TransformToVisual(HistoryButton);
-                var p = t.Transform(new System.Windows.Point(0, 0));
-                columnLeftInTarget = p.X;
-                columnRightInTarget = p.X + HeadColumn.ActualWidth;
+                var btnTL = HistoryButton.PointToScreen(new System.Windows.Point(0, 0));
+                var btnBR = HistoryButton.PointToScreen(
+                    new System.Windows.Point(HistoryButton.ActualWidth, 0));
+                var colTL = HeadColumn.PointToScreen(new System.Windows.Point(0, 0));
+                var colBR = HeadColumn.PointToScreen(
+                    new System.Windows.Point(HeadColumn.ActualWidth, 0));
+
+                if (_hDock == HDock.Right)
+                    extraToClearColumn = Math.Max(0, btnTL.X - colTL.X);   // px to add LEFTWARD
+                else
+                    extraToClearColumn = Math.Max(0, colBR.X - btnBR.X);   // px to add RIGHTWARD
             }
         }
-        catch { /* fall back to button bounds */ }
+        catch { /* leave extraToClearColumn at 0 */ }
 
         // Border-center-Y == target-center-Y. Border margin is symmetric, so
         // popup-center-Y == Border-center-Y → y = (targetH - popupH) / 2.
         double y = (targetSize.Height - effectivePopupH) / 2.0;
 
-        // Preferred side: opposite the dock edge. We want the visible Border's
-        // edge (NOT the popup-window edge) to sit `visualGap` from the head
-        // column edge (not the button), so chat-head avatars don't overlap.
-        // Border-right in popup-coords = popupW - bm.Right.
-        // Border-left in popup-coords  = bm.Left.
+        // Preferred side: opposite the dock edge. Border edge sits `visualGap`
+        // from the *column's* edge (not the button's), so chat-head avatars
+        // don't overlap the popup.
         double xPreferred = _hDock == HDock.Right
-            ? columnLeftInTarget - visualGap - effectivePopupW + bm.Right     // popup to the LEFT of column
-            : columnRightInTarget + visualGap - bm.Left;                       // popup to the RIGHT of column
-        double xFallback = _hDock == HDock.Right
-            ? columnRightInTarget + visualGap - bm.Left
-            : columnLeftInTarget - visualGap - effectivePopupW + bm.Right;
+            ? -extraToClearColumn - visualGap - effectivePopupW + bm.Right
+            : targetSize.Width + extraToClearColumn + visualGap - bm.Left;
 
-        // Primary axis = Vertical → WPF nudges Y to keep the popup on-screen,
-        // and falls back to xFallback if xPreferred overflows horizontally.
+        // No fallback — providing one lets WPF flip the popup to the wrong
+        // side when its overflow heuristics fire, which is worse than letting
+        // it clip at the screen edge. PrimaryAxis.Horizontal lets WPF nudge X
+        // to keep the popup on-screen without changing sides.
         return new[]
         {
             new System.Windows.Controls.Primitives.CustomPopupPlacement(
                 new System.Windows.Point(xPreferred, y),
-                System.Windows.Controls.Primitives.PopupPrimaryAxis.Vertical),
-            new System.Windows.Controls.Primitives.CustomPopupPlacement(
-                new System.Windows.Point(xFallback, y),
-                System.Windows.Controls.Primitives.PopupPrimaryAxis.Vertical),
+                System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
         };
     }
 
