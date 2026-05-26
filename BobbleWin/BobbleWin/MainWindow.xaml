@@ -248,6 +248,33 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Flat row button used for clickable history entries. -->
+        <Style x:Key="HistoryRowButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#F3E9DF" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RowBg"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="6,4">
+                            <ContentPresenter HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowBg" Property="Background" Value="#22F3E9DF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="RootGrid" Background="Transparent">
@@ -439,7 +466,8 @@
                         FontSize="20"
                         Command="{Binding AddSessionCommand}" />
 
-                <Button Style="{StaticResource CircleControlButton}"
+                <Button x:Name="HistoryButton"
+                        Style="{StaticResource CircleControlButton}"
                         Margin="0,0,8,8"
                         ToolTip="History"
                         Content="&#xE81C;"
@@ -515,66 +543,86 @@
             </StackPanel>
         </Grid>
 
-        <!-- History flyout panel -->
-        <Border x:Name="HistoryPopup"
-                Width="280"
-                MaxHeight="360"
-                Background="#F22E2A26"
-                BorderBrush="#66544A41"
-                BorderThickness="1"
-                CornerRadius="14"
-                Padding="12"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,80,80,0"
-                RenderTransformOrigin="1,0"
-                Visibility="Collapsed">
-            <Border.RenderTransform>
-                <TransformGroup>
-                    <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
-                    <TranslateTransform X="20" Y="-10" />
-                </TransformGroup>
-            </Border.RenderTransform>
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="History" Foreground="#F3E9DF" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding HistorySessions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type models:ChatSession}">
-                                <Grid Margin="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding Name}"
-                                               Foreground="#F3E9DF"
-                                               VerticalAlignment="Center" />
-                                    <Button Grid.Column="1"
-                                            Style="{StaticResource ToolButton}"
-                                            Margin="6,0,0,0"
-                                            ToolTip="Open"
-                                            Content="&#xE8A7;"
+        <!-- History flyout panel. Hosted in a Popup so it can float outside the
+             window bounds and be anchored precisely to the history button. -->
+        <Popup x:Name="HistoryPopup"
+               Placement="Absolute"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="None"
+               HorizontalOffset="0"
+               VerticalOffset="0">
+            <Border x:Name="HistoryPopupBorder"
+                    Width="280"
+                    MaxHeight="420"
+                    Background="#F22E2A26"
+                    BorderBrush="#66544A41"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="12"
+                    Margin="8"
+                    RenderTransformOrigin="1,0.5">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.45" Color="#000000" />
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
+                        <TranslateTransform X="20" Y="0" />
+                    </TransformGroup>
+                </Border.RenderTransform>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="History" Foreground="#F3E9DF" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding HistorySessions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:ChatSession}">
+                                    <Button Style="{StaticResource HistoryRowButton}"
+                                            Margin="0,2"
                                             Click="RestoreHistory_Click"
-                                            Tag="{Binding Id}" />
-                                    <Button Grid.Column="2"
-                                            Style="{StaticResource ToolButton}"
-                                            Margin="6,0,0,0"
-                                            ToolTip="Delete"
-                                            Content="&#xE74D;"
-                                            Click="DeleteHistory_Click"
-                                            Tag="{Binding Id}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </Grid>
-        </Border>
+                                            Tag="{Binding Id}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse Grid.Column="0"
+                                                     Width="28" Height="28"
+                                                     Margin="0,0,10,0">
+                                                <Ellipse.Fill>
+                                                    <ImageBrush ImageSource="{Binding ChatHeadImageName, Converter={StaticResource ChatHeadAvatarConverter}}"
+                                                                Stretch="UniformToFill" />
+                                                </Ellipse.Fill>
+                                            </Ellipse>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}"
+                                                       Foreground="#F3E9DF"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Column="2"
+                                                    Style="{StaticResource ToolButton}"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Margin="6,0,0,0"
+                                                    ToolTip="Delete"
+                                                    Content="&#xE74D;"
+                                                    Click="DeleteHistory_Click"
+                                                    Tag="{Binding Id}" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Popup>
     </Grid>
 </Window>

@@ -87,21 +87,79 @@ public partial class MainWindow : Window
 
     private void AnimateHistoryPopupVisibility(bool show)
     {
-        if (HistoryPopup is null) return;
-        UpdatePanelTransformOrigin(HistoryPopup);
+        if (HistoryPopup is null || HistoryPopupBorder is null) return;
 
         if (show)
         {
-            HistoryPopup.Visibility = Visibility.Visible;
-            BuildPanelShowStoryboard().Begin(HistoryPopup, true);
+            // Origin emanates from the side facing the head column, vertically
+            // centered on the button.
+            HistoryPopupBorder.RenderTransformOrigin =
+                new System.Windows.Point(_hDock == HDock.Right ? 1.0 : 0.0, 0.5);
+
+            // Open first so the popup is realized in the visual tree, then
+            // position it based on its measured size on the next layout pass.
+            HistoryPopup.IsOpen = true;
+            Dispatcher.BeginInvoke(new Action(PositionHistoryPopup),
+                System.Windows.Threading.DispatcherPriority.Loaded);
+            BuildPanelShowStoryboard().Begin(HistoryPopupBorder, true);
         }
         else
         {
-            if (HistoryPopup.Visibility != Visibility.Visible) return;
+            if (!HistoryPopup.IsOpen) return;
             var sb = BuildPanelHideStoryboard();
-            sb.Completed += (_, _) => HistoryPopup.Visibility = Visibility.Collapsed;
-            sb.Begin(HistoryPopup, true);
+            sb.Completed += (_, _) => HistoryPopup.IsOpen = false;
+            sb.Begin(HistoryPopupBorder, true);
         }
+    }
+
+    /// <summary>
+    /// Anchors the history flyout vertically centered on the history button.
+    /// The popup is placed on the side of the button opposite the head-column's
+    /// dock edge, then clamped to the active screen's work area. When the content
+    /// exceeds MaxHeight, the inner ScrollViewer takes over.
+    /// </summary>
+    private void PositionHistoryPopup()
+    {
+        if (HistoryPopup is null || HistoryButton is null || HistoryPopupBorder is null) return;
+        if (!HistoryButton.IsLoaded) return;
+
+        HistoryPopupBorder.UpdateLayout();
+        double popupW = HistoryPopupBorder.ActualWidth > 0
+            ? HistoryPopupBorder.ActualWidth
+            : HistoryPopupBorder.Width;
+        double popupH = HistoryPopupBorder.ActualHeight > 0
+            ? HistoryPopupBorder.ActualHeight
+            : HistoryPopupBorder.MaxHeight;
+        // Add the Border's Margin to account for the drop-shadow gutter.
+        popupW += HistoryPopupBorder.Margin.Left + HistoryPopupBorder.Margin.Right;
+        popupH += HistoryPopupBorder.Margin.Top + HistoryPopupBorder.Margin.Bottom;
+
+        // Button screen position (device pixels → DIPs).
+        System.Windows.Point btnTLpx;
+        System.Windows.Point btnBRpx;
+        try
+        {
+            btnTLpx = HistoryButton.PointToScreen(new System.Windows.Point(0, 0));
+            btnBRpx = HistoryButton.PointToScreen(new System.Windows.Point(HistoryButton.ActualWidth, HistoryButton.ActualHeight));
+        }
+        catch { return; }
+
+        var btnTL = PixelsToDip(btnTLpx.X, btnTLpx.Y);
+        var btnBR = PixelsToDip(btnBRpx.X, btnBRpx.Y);
+        double btnCenterY = (btnTL.Y + btnBR.Y) / 2.0;
+
+        const double gap = 8;
+        double left = _hDock == HDock.Right
+            ? btnTL.X - gap - popupW
+            : btnBR.X + gap;
+        double top = btnCenterY - popupH / 2.0;
+
+        var wa = GetWorkAreaForPoint(btnTL.X, btnTL.Y);
+        left = Math.Max(wa.Left + 4, Math.Min(left, wa.Right - popupW - 4));
+        top = Math.Max(wa.Top + 4, Math.Min(top, wa.Bottom - popupH - 4));
+
+        HistoryPopup.HorizontalOffset = left;
+        HistoryPopup.VerticalOffset = top;
     }
 
     private void UpdatePanelTransformOrigin(System.Windows.FrameworkElement panel)
@@ -395,6 +453,10 @@ public partial class MainWindow : Window
         var corner = GetHeadAnchorCornerInWindow();
         Left = _anchorScreenX - corner.X;
         Top = _anchorScreenY - corner.Y;
+
+        // Keep the history flyout glued to the history button as it moves.
+        if (HistoryPopup is { IsOpen: true })
+            PositionHistoryPopup();
     }
 
     private void UpdateAnchorFromCurrentPosition()
@@ -686,7 +748,7 @@ public partial class MainWindow : Window
 
     private void HistoryButton_Click(object sender, RoutedEventArgs e)
     {
-        AnimateHistoryPopupVisibility(HistoryPopup.Visibility != Visibility.Visible);
+        AnimateHistoryPopupVisibility(!HistoryPopup.IsOpen);
     }
 
     private void RestoreHistory_Click(object sender, RoutedEventArgs e)
