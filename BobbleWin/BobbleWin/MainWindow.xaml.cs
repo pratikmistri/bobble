@@ -111,6 +111,15 @@ public partial class MainWindow : Window
         }
         catch { /* leave extraToClearColumn at 0 */ }
 
+        // When the popup opens on the LEFT side of the button column (dock
+        // right), the screen-space column-overhang calculation has historically
+        // been unreliable and visually places the popup too close to (or
+        // overlapping) the chathead avatars. Apply an additional fixed
+        // breathing-room offset on that side so the popup sits clear of the
+        // head column regardless of measure timing.
+        if (_hDock == HDock.Right)
+            extraToClearColumn = Math.Max(extraToClearColumn, 60);
+
         // Border-center-Y == target-center-Y. Border margin is symmetric, so
         // popup-center-Y == Border-center-Y → y = (targetH - popupH) / 2.
         double y = (targetSize.Height - effectivePopupH) / 2.0;
