@@ -371,7 +371,7 @@
                             BorderBrush="#66544A41"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="6,4">
+                            Padding="8">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
